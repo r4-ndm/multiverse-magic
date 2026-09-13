@@ -79,6 +79,21 @@ openspace/
 | **M** | Toggle Microphone Mute / Unmute |
 | **Escape** | Release Pointer Lock |
 
+## 🤖 Agent-Friendly Quickstart ("Agent, put me in the chat")
+
+Multiverse Magic is designed for autonomous coding agents (Antigravity, Cursor, Claude Code, Devin, etc.).
+
+If your agent cloned this repo, you can simply tell your agent:
+> *"Agent, launch Multiverse Magic and put me in the chat."*
+
+The agent only needs to run:
+```bash
+npm install && npm run join
+```
+This automatically starts the backend server, Vite client, and opens your browser directly into the universe cockpit!
+
+See **[`AGENT.md`](./AGENT.md)** for full machine-readable directives and headless bot instructions.
+
 ---
 
 ## ⚡ Getting Started
