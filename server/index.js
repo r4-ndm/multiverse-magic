@@ -3,7 +3,14 @@ import express from "express";
 import cors from "cors";
 import colyseus from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 import { SpaceRoom } from "./rooms/SpaceRoom.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const distPath = path.join(__dirname, "..", "dist");
 
 const { Server } = colyseus;
 
@@ -15,8 +22,20 @@ app.use(express.json());
 
 // Basic health check endpoint
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", name: "OpenSpace Server", uptime: process.uptime() });
+  res.json({ status: "ok", name: "Multiverse Magic Server", uptime: process.uptime() });
 });
+
+// Serve static frontend build in production
+if (fs.existsSync(distPath)) {
+  console.log(`[Server] Serving production client from ${distPath}`);
+  app.use(express.static(distPath));
+  app.use((req, res, next) => {
+    if (req.method === "GET" && !req.path.startsWith("/matchmake") && !req.path.startsWith("/colyseus")) {
+      return res.sendFile(path.join(distPath, "index.html"));
+    }
+    next();
+  });
+}
 
 // Create HTTP and Colyseus Server with WebSocketTransport
 const httpServer = http.createServer(app);

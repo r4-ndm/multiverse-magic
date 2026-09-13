@@ -31,9 +31,15 @@ export class NetworkSystem {
     const params = new URLSearchParams(window.location.search);
     const roomName = params.get("room") || "space";
 
-    const wsUrl =
-      serverUrl ||
-      `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}:2567`;
+    let defaultWsUrl;
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      defaultWsUrl = `ws://${window.location.hostname}:2567`;
+    } else {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      defaultWsUrl = `${protocol}//${window.location.host}`;
+    }
+
+    const wsUrl = serverUrl || defaultWsUrl;
 
     console.log(`[NetworkSystem] Connecting to ${wsUrl} (room: ${roomName})...`);
     this.client = new Client(wsUrl);
