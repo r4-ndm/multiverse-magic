@@ -375,6 +375,38 @@
       margin-bottom: 2px;
     }
 
+    .pilot-name-box {
+      margin-bottom: 22px;
+      text-align: left;
+    }
+    .pilot-name-box label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--neon-cyan);
+      letter-spacing: 1.5px;
+      margin-bottom: 8px;
+    }
+    #pilot-name-input {
+      width: 100%;
+      background: rgba(4, 7, 15, 0.9);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      color: #00f0ff;
+      padding: 13px 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      outline: none;
+      box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.6);
+      transition: all 0.2s ease;
+    }
+    #pilot-name-input:focus {
+      border-color: var(--neon-cyan);
+      box-shadow: 0 0 16px rgba(0, 240, 255, 0.4);
+    }
+
     #enter-btn {
       width: 100%;
       padding: 16px 24px;
@@ -469,7 +501,7 @@
   <!-- Entry Screen Modal -->
   <div id="entry-overlay">
     <div class="entry-card">
-      <h1 class="entry-title">OPENSPACE</h1>
+      <h1 class="entry-title">MULTIVERSE MAGIC</h1>
       <p class="entry-tagline">A Permissionless 3D Proximity Chat Universe</p>
 
       <div class="feature-list">
@@ -489,6 +521,11 @@
           <span>COMMUNITY EJECTION</span>
           Defend your space. Shoot trolls into deep space.
         </div>
+      </div>
+
+      <div class="pilot-name-box">
+        <label for="pilot-name-input">PILOT CALLSIGN // NAME</label>
+        <input type="text" id="pilot-name-input" placeholder="e.g. Maverick, StarLord, Nova..." maxlength="16" />
       </div>
 
       <button id="enter-btn">CLICK TO ENTER SPACE</button>

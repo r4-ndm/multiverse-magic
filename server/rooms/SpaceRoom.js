@@ -73,11 +73,24 @@ export class SpaceRoom extends Room {
     this.onMessage("chat", (client, text) => {
       if (typeof text !== "string" || !text.trim()) return;
       const cleanText = text.slice(0, 200).trim();
+      const player = this.state.players.get(client.sessionId);
+      const senderName = player?.name || client.sessionId.slice(0, 6);
       this.broadcast("chat", {
         senderId: client.sessionId,
+        senderName: senderName,
         text: cleanText,
         timestamp: Date.now(),
       });
+    });
+
+    // Dynamic username change handler
+    this.onMessage("set_name", (client, name) => {
+      if (typeof name !== "string" || !name.trim()) return;
+      const player = this.state.players.get(client.sessionId);
+      if (player) {
+        player.name = name.trim().slice(0, 18);
+        this.broadcast("name_changed", { id: client.sessionId, name: player.name });
+      }
     });
 
     // Health regeneration loop: +1 HP per second when not taking damage
@@ -148,23 +161,30 @@ export class SpaceRoom extends Room {
     target.z = EJECTION_COORDS.z;
     target.health = 100;
 
-    console.log(`[SpaceRoom] Player ${targetId} was ejected to deep space!`);
+    console.log(`[SpaceRoom] Player ${target.name || targetId} was ejected to deep space!`);
 
     // Broadcast ejection announcement to entire space
     this.broadcast("player_ejected", {
       targetId,
       shooterId,
+      targetName: target.name || targetId.slice(0, 6),
       ejectionCoords: EJECTION_COORDS,
-      message: `Player [${targetId.slice(0, 6)}] was ejected into deep space!`,
+      message: `Pilot [${target.name || targetId.slice(0, 6)}] was ejected into deep space!`,
     });
   }
 
-  onJoin(client, options) {
-    console.log(`[SpaceRoom] Player joined: ${client.sessionId}`);
+  onJoin(client, options = {}) {
+    const pilotName =
+      typeof options.name === "string" && options.name.trim()
+        ? options.name.trim().slice(0, 18)
+        : `Pilot-${client.sessionId.slice(0, 4)}`;
+
+    console.log(`[SpaceRoom] Player joined: ${pilotName} (${client.sessionId})`);
 
     // Spawn player in a 30-unit neighborhood around origin
     const player = new Player();
     player.id = client.sessionId;
+    player.name = pilotName;
     player.x = (Math.random() - 0.5) * 30;
     player.y = (Math.random() - 0.5) * 10;
     player.z = (Math.random() - 0.5) * 30;
@@ -175,7 +195,7 @@ export class SpaceRoom extends Room {
     this.state.players.set(client.sessionId, player);
 
     // Notify clients of new entrant
-    this.broadcast("player_joined", { id: client.sessionId }, { except: client });
+    this.broadcast("player_joined", { id: client.sessionId, name: pilotName }, { except: client });
   }
 
   onLeave(client, consented) {

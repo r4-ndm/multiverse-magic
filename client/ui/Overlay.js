@@ -18,6 +18,7 @@ export class Overlay {
     this.healthValue = document.getElementById("health-value");
     this.damageVignette = document.getElementById("damage-vignette");
     this.chatInput = document.getElementById("chat-input");
+    this.pilotNameInput = document.getElementById("pilot-name-input");
 
     this.onEnterCallback = null;
     this.onChatSend = null;
@@ -28,13 +29,22 @@ export class Overlay {
     this.onEnterCallback = onEnter;
     this.onChatSend = onChatSend;
 
+    // Load or generate default pilot callsign
+    const savedName = localStorage.getItem("pilot_callsign") || `Pilot-${Math.floor(1000 + Math.random() * 9000)}`;
+    if (this.pilotNameInput) {
+      this.pilotNameInput.value = savedName;
+    }
+
     this.enterBtn.addEventListener("click", async () => {
       if (this.isEntered) return;
       this.isEntered = true;
 
+      const chosenName = this.pilotNameInput?.value.trim() || savedName;
+      localStorage.setItem("pilot_callsign", chosenName);
+
       // Trigger user activation callback (mic request, audio context, colyseus connect)
       if (this.onEnterCallback) {
-        await this.onEnterCallback();
+        await this.onEnterCallback(chosenName);
       }
 
       // Hide entry screen and show HUD
@@ -67,8 +77,10 @@ export class Overlay {
     }
   }
 
-  setPlayerInfo(id, roomName = "SPACE") {
-    if (this.playerIdEl) this.playerIdEl.innerText = id.slice(0, 8);
+  setPlayerInfo(id, roomName = "SPACE", pilotName = null) {
+    if (this.playerIdEl) {
+      this.playerIdEl.innerText = pilotName ? `${pilotName} [${id.slice(0, 4)}]` : id.slice(0, 8);
+    }
     const roomEl = document.getElementById("hud-room-id");
     if (roomEl) roomEl.innerText = roomName.toUpperCase();
   }

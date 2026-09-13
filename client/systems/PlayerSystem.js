@@ -62,11 +62,32 @@ export class PlayerSystem {
     this.mesh = this.createSpaceshipMesh(0x00f0ff);
     this.scene.add(this.mesh);
 
+    // Create holographic nametag above local ship
+    this.localName = "YOU";
+    this.localNametag = this.createNametagSprite(this.localName, 100, true);
+    this.localNametag.position.set(0, 2.3, 0);
+    this.mesh.add(this.localNametag);
+
     // Setup input listeners
     this.setupInputs();
 
     // Try loading .glb model asynchronously
     this.loadGlbModel();
+  }
+
+  setLocalName(name) {
+    if (!name) return;
+    this.localName = name;
+    if (this.localNametag) {
+      this.updateNametagSprite(this.localNametag, this.localName, this.health);
+    }
+  }
+
+  setLocalHealth(health) {
+    this.health = health;
+    if (this.localNametag) {
+      this.updateNametagSprite(this.localNametag, this.localName, this.health);
+    }
   }
 
   loadGlbModel() {
@@ -311,10 +332,12 @@ export class PlayerSystem {
       const mesh = this.createSpaceshipMesh(color);
       mesh.userData.playerId = sessionId;
 
-      // Create health bar sprite billboard
-      const healthSprite = this.createHealthSprite(data.health || 100);
-      healthSprite.position.set(0, 2.0, 0);
-      mesh.add(healthSprite);
+      const pilotName = data.name || `Pilot-${sessionId.slice(0, 4)}`;
+
+      // Create holographic nametag + health billboard above ship
+      const nametagSprite = this.createNametagSprite(pilotName, data.health || 100, false);
+      nametagSprite.position.set(0, 2.3, 0);
+      mesh.add(nametagSprite);
 
       this.scene.add(mesh);
 
@@ -324,7 +347,8 @@ export class PlayerSystem {
         targetRot: data.rotation || 0,
         targetPitch: data.pitch || 0,
         health: data.health || 100,
-        healthSprite,
+        name: pilotName,
+        nametagSprite,
       };
 
       mesh.position.copy(remote.targetPos);
@@ -336,9 +360,15 @@ export class PlayerSystem {
       if (typeof data.z === "number") remote.targetPos.z = data.z;
       if (typeof data.rotation === "number") remote.targetRot = data.rotation;
       if (typeof data.pitch === "number") remote.targetPitch = data.pitch;
-      if (typeof data.health === "number" && data.health !== remote.health) {
-        remote.health = data.health;
-        this.updateHealthSprite(remote.healthSprite, remote.health);
+
+      const nameChanged = typeof data.name === "string" && data.name !== remote.name;
+      const healthChanged = typeof data.health === "number" && data.health !== remote.health;
+
+      if (nameChanged) remote.name = data.name;
+      if (healthChanged) remote.health = data.health;
+
+      if (nameChanged || healthChanged) {
+        this.updateNametagSprite(remote.nametagSprite, remote.name, remote.health);
       }
     }
   }
@@ -364,13 +394,13 @@ export class PlayerSystem {
     });
   }
 
-  createHealthSprite(health) {
+  createNametagSprite(name = "Pilot", health = 100, isLocal = false) {
     const canvas = document.createElement("canvas");
-    canvas.width = 256;
-    canvas.height = 36;
+    canvas.width = 320;
+    canvas.height = 80;
     const texture = new THREE.CanvasTexture(canvas);
 
-    this.drawHealthBar(canvas, health);
+    this.drawNametag(canvas, name, health, isLocal);
 
     const spriteMat = new THREE.SpriteMaterial({
       map: texture,
@@ -378,49 +408,74 @@ export class PlayerSystem {
       transparent: true,
     });
     const sprite = new THREE.Sprite(spriteMat);
-    sprite.scale.set(3.0, 0.45, 1.0);
-    sprite.userData = { canvas, texture };
+    sprite.scale.set(3.6, 0.9, 1.0);
+    sprite.userData = { canvas, texture, name, health, isLocal };
     return sprite;
   }
 
-  updateHealthSprite(sprite, health) {
+  updateNametagSprite(sprite, name, health) {
     if (!sprite || !sprite.userData) return;
+    if (name !== undefined) sprite.userData.name = name;
+    if (health !== undefined) sprite.userData.health = health;
+
     const { canvas, texture } = sprite.userData;
-    this.drawHealthBar(canvas, health);
+    this.drawNametag(canvas, sprite.userData.name, sprite.userData.health, sprite.userData.isLocal);
     texture.needsUpdate = true;
   }
 
-  drawHealthBar(canvas, health) {
+  drawNametag(canvas, name, health, isLocal) {
     const ctx = canvas.getContext("2d");
     const w = canvas.width;
     const h = canvas.height;
 
     ctx.clearRect(0, 0, w, h);
 
-    // Frame
-    ctx.fillStyle = "rgba(10, 15, 25, 0.85)";
-    ctx.strokeStyle = "rgba(0, 240, 255, 0.6)";
-    ctx.lineWidth = 3;
+    // 1. Holographic Backdrop Pill
+    ctx.fillStyle = "rgba(6, 10, 20, 0.82)";
+    ctx.strokeStyle = isLocal ? "rgba(0, 240, 255, 0.7)" : "rgba(255, 0, 85, 0.7)";
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.roundRect(4, 4, w - 8, h - 8, 8);
+    ctx.roundRect(4, 4, w - 8, h - 8, 12);
     ctx.fill();
     ctx.stroke();
 
-    // Fill
+    // 2. Pilot Name
+    ctx.font = "bold 22px 'JetBrains Mono', 'Orbitron', monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = isLocal ? "#00f0ff" : "#ff99bb";
+    ctx.shadowColor = isLocal ? "rgba(0, 240, 255, 0.8)" : "rgba(255, 0, 85, 0.8)";
+    ctx.shadowBlur = 8;
+    ctx.fillText(name.toUpperCase(), w / 2, 26);
+    ctx.shadowBlur = 0; // reset shadow
+
+    // 3. Integrated Health Bar
+    const barX = 20;
+    const barY = 48;
+    const barW = w - 40;
+    const barH = 14;
+
+    // Bar background
+    ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
+    ctx.beginPath();
+    ctx.roundRect(barX, barY, barW, barH, 4);
+    ctx.fill();
+
+    // Bar fill
     const pct = Math.max(0, Math.min(100, health)) / 100;
-    const fillWidth = (w - 14) * pct;
+    const fillWidth = barW * pct;
 
     if (pct < 0.3) {
       ctx.fillStyle = "#ff0055"; // Danger red
     } else if (pct < 0.6) {
       ctx.fillStyle = "#ffaa00"; // Warning amber
     } else {
-      ctx.fillStyle = "#00ff88"; // Healthy neon green
+      ctx.fillStyle = isLocal ? "#00f0ff" : "#00ff88"; // Healthy
     }
 
     if (fillWidth > 0) {
       ctx.beginPath();
-      ctx.roundRect(7, 7, fillWidth, h - 14, 4);
+      ctx.roundRect(barX, barY, fillWidth, barH, 4);
       ctx.fill();
     }
   }

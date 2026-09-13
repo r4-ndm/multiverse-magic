@@ -47,8 +47,8 @@ class OpenSpaceApp {
 
     // 3. Initialize Overlay UI and entry flow
     this.overlay.init(
-      async () => {
-        await this.handleUserEntry();
+      async (pilotName) => {
+        await this.handleUserEntry(pilotName);
       },
       (text) => {
         if (this.networkSystem?.room) {
@@ -61,8 +61,10 @@ class OpenSpaceApp {
     this.animate();
   }
 
-  async handleUserEntry() {
-    console.log("[OpenSpaceApp] User entered space. Initializing Audio & Network...");
+  async handleUserEntry(pilotName) {
+    console.log(`[OpenSpaceApp] Pilot [${pilotName}] entered space. Initializing Audio & Network...`);
+    this.pilotName = pilotName || `Pilot-${Math.floor(1000 + Math.random() * 9000)}`;
+    this.playerSystem.setLocalName(this.pilotName);
 
     // 1. Audio Activation: user gesture enables AudioContext & getUserMedia mic stream
     const audioResult = await this.audioSystem.init(this.networkSystem, this.playerSystem);
@@ -74,9 +76,9 @@ class OpenSpaceApp {
 
     // 2. Connect to Colyseus Server
     try {
-      const room = await this.networkSystem.connect();
-      this.overlay.setPlayerInfo(room.sessionId, room.name);
-      this.overlay.addLogItem(`🌌 Connected to Space Sector [${room.id}]`);
+      const room = await this.networkSystem.connect(null, { name: this.pilotName });
+      this.overlay.setPlayerInfo(room.sessionId, room.name, this.pilotName);
+      this.overlay.addLogItem(`🌌 Pilot [${this.pilotName}] connected to Sector [${room.id}]`);
 
       // Initialize Combat System with network and audio
       this.combatSystem.init(this.networkSystem, this.playerSystem, this.audioSystem);
@@ -98,20 +100,21 @@ class OpenSpaceApp {
         // Local player initial state
         this.playerSystem.localId = sessionId;
         this.playerSystem.teleport(playerState.x, playerState.y, playerState.z);
-        this.playerSystem.health = playerState.health;
+        this.playerSystem.setLocalHealth(playerState.health);
+        this.playerSystem.setLocalName(playerState.name || this.pilotName);
       } else {
         // Remote peer
         this.playerSystem.addOrUpdateRemotePlayer(sessionId, playerState);
-        this.overlay.addLogItem(`Pilot [${sessionId.slice(0, 6)}] materialized nearby`);
+        const name = playerState.name || sessionId.slice(0, 6);
+        this.overlay.addLogItem(`Pilot [${name}] materialized nearby`);
       }
     };
 
-    // 2. Player Changed (Movement / Health updates)
+    // 2. Player Changed (Movement / Health / Name updates)
     this.networkSystem.onPlayerChange = (sessionId, playerState) => {
       if (sessionId === this.networkSystem.sessionId) {
-        // Local health update
         if (playerState.health !== this.playerSystem.health) {
-          this.playerSystem.health = playerState.health;
+          this.playerSystem.setLocalHealth(playerState.health);
         }
       } else {
         this.playerSystem.addOrUpdateRemotePlayer(sessionId, playerState);
@@ -131,11 +134,15 @@ class OpenSpaceApp {
 
     this.networkSystem.onPlayerHit = (data) => {
       this.combatSystem.handlePlayerHit(data);
+      if (data.targetId === this.networkSystem.sessionId) {
+        this.playerSystem.setLocalHealth(data.health);
+      }
     };
 
     // 5. Deep Space Ejection
     this.networkSystem.onPlayerEjected = (data) => {
       const isLocal = data.targetId === this.networkSystem.sessionId;
+      const targetName = data.targetName || data.targetId.slice(0, 6);
       this.audioSystem.playWhooshSound();
 
       if (isLocal) {
@@ -145,8 +152,8 @@ class OpenSpaceApp {
           data.ejectionCoords.y,
           data.ejectionCoords.z
         );
-        this.playerSystem.health = 100;
-        this.overlay.showEjection(true, data.targetId, data.ejectionCoords);
+        this.playerSystem.setLocalHealth(100);
+        this.overlay.showEjection(true, targetName, data.ejectionCoords);
       } else {
         // Remote player ejected
         const remote = this.playerSystem.remotePlayers.get(data.targetId);
@@ -157,9 +164,8 @@ class OpenSpaceApp {
             data.ejectionCoords.z
           );
         }
-        // Naturally disconnect proximity audio since they are now at (10000, 10000, 10000)
         this.audioSystem.disconnectPeer(data.targetId);
-        this.overlay.showEjection(false, data.targetId, data.ejectionCoords);
+        this.overlay.showEjection(false, targetName, data.ejectionCoords);
       }
     };
 
@@ -170,7 +176,8 @@ class OpenSpaceApp {
 
     // 7. Pilot & AI Agent Chat with 3D Spatial Voice Synthesis
     this.networkSystem.onChatMessage = (data) => {
-      this.overlay.addLogItem(`💬 [${data.senderId.slice(0, 6)}]: ${data.text}`);
+      const name = data.senderName || data.senderId.slice(0, 6);
+      this.overlay.addLogItem(`💬 [${name}]: ${data.text}`);
 
       // If sender is remote, speak their message in 3D spatial proximity!
       if (data.senderId !== this.networkSystem.sessionId) {

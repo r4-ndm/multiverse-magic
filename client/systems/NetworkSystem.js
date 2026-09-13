@@ -22,10 +22,11 @@ export class NetworkSystem {
     this.onPlayerEjected = null;
     this.onSignalReceived = null;
     this.onChatMessage = null;
+    this.onNameChanged = null;
     this.onLogEvent = null;
   }
 
-  async connect(serverUrl) {
+  async connect(serverUrl, options = {}) {
     // Zero friction: Room determined by URL param or default "space"
     const params = new URLSearchParams(window.location.search);
     const roomName = params.get("room") || "space";
@@ -38,9 +39,9 @@ export class NetworkSystem {
     this.client = new Client(wsUrl);
 
     try {
-      this.room = await this.client.joinOrCreate(roomName);
+      this.room = await this.client.joinOrCreate(roomName, options);
       this.sessionId = this.room.sessionId;
-      console.log(`[NetworkSystem] Joined room: ${this.room.id} as ${this.sessionId}`);
+      console.log(`[NetworkSystem] Joined room: ${this.room.id} as ${this.sessionId} (Pilot: ${options.name || 'Anonymous'})`);
 
       this.setupRoomListeners();
       return this.room;
@@ -87,8 +88,13 @@ export class NetworkSystem {
       if (this.onChatMessage) this.onChatMessage(data);
     });
 
+    this.room.onMessage("name_changed", (data) => {
+      if (this.onNameChanged) this.onNameChanged(data.id, data.name);
+    });
+
     this.room.onMessage("player_joined", (data) => {
-      if (this.onLogEvent) this.onLogEvent(`Pilot [${data.id.slice(0, 6)}] entered space`);
+      const name = data.name || data.id.slice(0, 6);
+      if (this.onLogEvent) this.onLogEvent(`Pilot [${name}] entered space`);
     });
 
     this.room.onMessage("player_left", (data) => {

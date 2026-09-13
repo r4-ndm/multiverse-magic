@@ -11,6 +11,7 @@ import { Schema, defineTypes, MapSchema } from "@colyseus/schema";
 export class Player extends Schema {}
 defineTypes(Player, {
   id: "string",
+  name: "string",
   x: "number",
   y: "number",
   z: "number",

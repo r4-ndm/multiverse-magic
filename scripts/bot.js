@@ -22,7 +22,7 @@ const CHATTER_LINES = [
 
 async function startBot() {
   try {
-    const room = await client.joinOrCreate(roomName);
+    const room = await client.joinOrCreate(roomName, { name: botName });
     console.log(`✓ [${botName}] Successfully spawned in universe! SessionID: ${room.sessionId}`);
 
     let angle = Math.random() * Math.PI * 2;
