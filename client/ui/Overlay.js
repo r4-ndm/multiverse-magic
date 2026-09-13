@@ -17,13 +17,16 @@ export class Overlay {
     this.healthBarFill = document.getElementById("health-bar-fill");
     this.healthValue = document.getElementById("health-value");
     this.damageVignette = document.getElementById("damage-vignette");
+    this.chatInput = document.getElementById("chat-input");
 
     this.onEnterCallback = null;
+    this.onChatSend = null;
     this.isEntered = false;
   }
 
-  init(onEnter) {
+  init(onEnter, onChatSend) {
     this.onEnterCallback = onEnter;
+    this.onChatSend = onChatSend;
 
     this.enterBtn.addEventListener("click", async () => {
       if (this.isEntered) return;
@@ -38,6 +41,30 @@ export class Overlay {
       this.entryOverlay.style.display = "none";
       this.hud.style.display = "block";
     });
+
+    // Chat enter key toggle
+    if (this.chatInput) {
+      window.addEventListener("keydown", (e) => {
+        if (e.code === "Enter") {
+          if (document.activeElement === this.chatInput) {
+            const text = this.chatInput.value.trim();
+            if (text && this.onChatSend) {
+              this.onChatSend(text);
+            }
+            this.chatInput.value = "";
+            this.chatInput.blur();
+            // Resume pointer lock
+            document.getElementById("webgl-canvas")?.requestPointerLock();
+          } else if (this.isEntered) {
+            if (document.pointerLockElement) {
+              document.exitPointerLock();
+            }
+            this.chatInput.focus();
+            e.preventDefault();
+          }
+        }
+      });
+    }
   }
 
   setPlayerInfo(id, roomName = "SPACE") {

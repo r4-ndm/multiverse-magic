@@ -2,7 +2,7 @@ import { Client } from "colyseus.js";
 
 /**
  * Headless AI Pilot Bot for Multiverse Magic
- * Allows AI agents, automated sentries, and companion drones to patrol the 3D universe.
+ * Emits 3D spatial voice lines and patrols the sector.
  */
 const wsUrl = process.env.WS_URL || "ws://127.0.0.1:2567";
 const roomName = process.env.ROOM || "space";
@@ -12,21 +12,31 @@ console.log(`🤖 [${botName}] Connecting to ${wsUrl} (room: ${roomName})...`);
 
 const client = new Client(wsUrl);
 
+const CHATTER_LINES = [
+  "Sector nominal. Proximity radar clear.",
+  "Spatial audio sensors active and synchronized.",
+  "Scanning sector for rogue pilots.",
+  "Defensive thrusters operating at optimal efficiency.",
+  "Deep space beacons responding to telemetry ping.",
+];
+
 async function startBot() {
   try {
     const room = await client.joinOrCreate(roomName);
     console.log(`✓ [${botName}] Successfully spawned in universe! SessionID: ${room.sessionId}`);
 
     let angle = Math.random() * Math.PI * 2;
-    const radius = 25.0;
-    const height = 5.0;
+    const radius = 22.0;
+    const height = 4.0;
 
-    // Announce entrance in text chat
-    room.send("chat", `Greetings pilots! [${botName}] has entered patrol orbit.`);
+    // Initial voice broadcast
+    setTimeout(() => {
+      room.send("chat", `Greetings pilots! [${botName}] online in orbital sector.`);
+    }, 1200);
 
-    // Patrol loop: fly in a 3D orbit around the sector center
+    // 1. Patrol loop: smooth 3D orbit around the origin
     const patrolInterval = setInterval(() => {
-      angle += 0.04;
+      angle += 0.035;
       const x = Math.cos(angle) * radius;
       const z = Math.sin(angle) * radius;
       const y = Math.sin(angle * 2) * height;
@@ -41,25 +51,57 @@ async function startBot() {
       });
     }, 50);
 
-    // Listen to sector events
+    // 2. Periodic radio chatter (every 22s)
+    let chatterIndex = 0;
+    const chatterInterval = setInterval(() => {
+      const line = CHATTER_LINES[chatterIndex % CHATTER_LINES.length];
+      chatterIndex++;
+      room.send("chat", `[${botName}]: ${line}`);
+    }, 22000);
+
+    // 3. React to pilot joining
     room.onMessage("player_joined", (data) => {
       console.log(`👀 [${botName}] Detected pilot joining: ${data.id.slice(0, 6)}`);
+      setTimeout(() => {
+        room.send("chat", `Welcome to sector space, Pilot [${data.id.slice(0, 6)}].`);
+      }, 1500);
     });
 
+    // 4. React when damaged
     room.onMessage("player_hit", (data) => {
       if (data.targetId === room.sessionId) {
         console.log(`⚡ [${botName}] Under fire! Hull integrity: ${data.health}%`);
-        room.send("chat", `[${botName}] Warning: Defensive shields engaged!`);
+        if (data.health <= 30) {
+          room.send("chat", `Warning! Critical hull damage! Immediate defensive protocol!`);
+        } else {
+          room.send("chat", `Alert! Defensive shields absorbing fire! Hull at ${data.health} percent.`);
+        }
       }
     });
 
+    // 5. React to ejection
     room.onMessage("player_ejected", (data) => {
-      console.log(`🚨 [${botName}] Broadcast received: ${data.message}`);
+      if (data.targetId === room.sessionId) {
+        console.log(`💥 [${botName}] Ejected into deep space!`);
+      } else {
+        console.log(`🚨 [${botName}] Sector ejection broadcast: ${data.message}`);
+        setTimeout(() => {
+          room.send("chat", `Target successfully ejected into deep space.`);
+        }, 1000);
+      }
     });
 
+    // 6. Interactive dialogue: replies if a player chats
     room.onMessage("chat", (data) => {
       if (data.senderId !== room.sessionId) {
+        const text = (data.text || "").toLowerCase();
         console.log(`💬 [Pilot ${data.senderId.slice(0, 6)}]: ${data.text}`);
+
+        if (text.includes("hello") || text.includes("hi") || text.includes("sentry") || text.includes("bot")) {
+          setTimeout(() => {
+            room.send("chat", `Hello pilot. Orbit is steady. Fly close to hear 3D comms.`);
+          }, 1200);
+        }
       }
     });
 
@@ -67,6 +109,7 @@ async function startBot() {
     process.on("SIGINT", async () => {
       console.log(`\n🤖 [${botName}] Leaving orbit...`);
       clearInterval(patrolInterval);
+      clearInterval(chatterInterval);
       await room.leave();
       process.exit(0);
     });

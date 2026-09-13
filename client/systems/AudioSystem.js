@@ -439,4 +439,69 @@ export class AudioSystem {
 
     this.ambientNodes = { osc1, osc2, masterDroneGain };
   }
+
+  /**
+   * Scifi radio chirp / comms tone before synthetic voice
+   */
+  playRadioChirp() {
+    if (!this.audioContext) return;
+    const now = this.audioContext.currentTime;
+
+    const osc = this.audioContext.createOscillator();
+    const gain = this.audioContext.createGain();
+
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(1600, now);
+    osc.frequency.setValueAtTime(2200, now + 0.03);
+
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+    osc.connect(gain);
+    gain.connect(this.audioContext.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.09);
+  }
+
+  /**
+   * Speaks text using browser SpeechSynthesis with 3D proximity volume attenuation
+   */
+  speakSpatial(text, sourcePosition, options = {}) {
+    if (!("speechSynthesis" in window)) return;
+
+    // Calculate distance between local player and agent
+    let volume = 1.0;
+    if (sourcePosition && this.playerSystem?.position) {
+      const dist = this.playerSystem.position.distanceTo(sourcePosition);
+      if (dist > this.PROXIMITY_RADIUS) {
+        // Beyond proximity voice radius
+        return;
+      }
+      // Linear falloff within 50 units
+      volume = Math.max(0.15, Math.min(1.0, 1.0 - (dist / this.PROXIMITY_RADIUS)));
+    }
+
+    // Play scifi radio comms beep
+    this.playRadioChirp();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.volume = volume;
+    utterance.rate = options.rate || 1.05;
+    utterance.pitch = options.pitch || 1.15; // Slightly robotic scifi pitch
+
+    // Choose robotic or standard voice if available
+    const voices = window.speechSynthesis.getVoices();
+    const scifiVoice = voices.find(
+      (v) =>
+        v.name.includes("Google") ||
+        v.name.includes("Natural") ||
+        v.name.includes("Daniel") ||
+        v.lang.startsWith("en")
+    );
+    if (scifiVoice) utterance.voice = scifiVoice;
+
+    window.speechSynthesis.speak(utterance);
+  }
 }
+

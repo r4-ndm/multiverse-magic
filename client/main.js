@@ -46,9 +46,16 @@ class OpenSpaceApp {
     this.worldSystem.register(new PlanetBeacon("nexus_beacon", new THREE.Vector3(0, -120, -350), 45));
 
     // 3. Initialize Overlay UI and entry flow
-    this.overlay.init(async () => {
-      await this.handleUserEntry();
-    });
+    this.overlay.init(
+      async () => {
+        await this.handleUserEntry();
+      },
+      (text) => {
+        if (this.networkSystem?.room) {
+          this.networkSystem.room.send("chat", text);
+        }
+      }
+    );
 
     // 4. Start Render Loop
     this.animate();
@@ -161,7 +168,19 @@ class OpenSpaceApp {
       this.audioSystem.handleSignal(fromSessionId, signal);
     };
 
-    // 7. General event logs
+    // 7. Pilot & AI Agent Chat with 3D Spatial Voice Synthesis
+    this.networkSystem.onChatMessage = (data) => {
+      this.overlay.addLogItem(`💬 [${data.senderId.slice(0, 6)}]: ${data.text}`);
+
+      // If sender is remote, speak their message in 3D spatial proximity!
+      if (data.senderId !== this.networkSystem.sessionId) {
+        const remote = this.playerSystem.remotePlayers.get(data.senderId);
+        const pos = remote ? remote.mesh.position : null;
+        this.audioSystem.speakSpatial(data.text, pos);
+      }
+    };
+
+    // 8. General event logs
     this.networkSystem.onLogEvent = (msg) => {
       this.overlay.addLogItem(msg);
     };
