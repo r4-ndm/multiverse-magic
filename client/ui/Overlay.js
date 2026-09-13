@@ -36,12 +36,15 @@ export class Overlay {
     this.hudMorphBtn = document.getElementById("hud-morph-btn");
     this.hudCameraBtn = document.getElementById("hud-camera-btn");
     this.hudStarmapBtn = document.getElementById("hud-starmap-btn");
+    this.hudBuildBtn = document.getElementById("hud-build-btn");
     this.starmapModal = document.getElementById("starmap-modal");
+    this.planetModal = document.getElementById("planet-modal");
     this.onCameraToggle = null;
     this.hyperlaneGate = null;
+    this.onBuildPlanetCallback = null;
   }
 
-  init(onEnter, onChatSend, onMorph, onCameraToggle = null, hyperlaneGate = null, playerSystem = null, audioSystem = null) {
+  init(onEnter, onChatSend, onMorph, onCameraToggle = null, hyperlaneGate = null, playerSystem = null, audioSystem = null, onBuildPlanet = null) {
     this.onEnterCallback = onEnter;
     this.onChatSend = onChatSend;
     this.onMorphCallback = onMorph;
@@ -49,6 +52,7 @@ export class Overlay {
     this.hyperlaneGate = hyperlaneGate;
     this.playerSystem = playerSystem;
     this.audioSystem = audioSystem;
+    this.onBuildPlanetCallback = onBuildPlanet;
 
     // Load default pilot callsign if a real custom name was previously saved
     const savedName = localStorage.getItem("pilot_callsign");
@@ -64,6 +68,9 @@ export class Overlay {
 
     // Initialize in-game interstellar starmap modal
     this.setupStarmapModal();
+
+    // Initialize in-game planet builder modal
+    this.setupPlanetModal();
 
     this.enterBtn.addEventListener("click", async () => {
       if (this.isEntered) return;
@@ -123,8 +130,14 @@ export class Overlay {
         }
       } else if (e.code === "KeyH" && this.isEntered) {
         // Toggle Morph Modal with H key when not typing in chat or input
-        if (document.activeElement?.tagName !== "INPUT") {
+        if (document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
           this.toggleMorphModal();
+          e.preventDefault();
+        }
+      } else if (e.code === "KeyB" && this.isEntered) {
+        // Toggle Planet Forge Modal with B key when not typing in chat or input
+        if (document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
+          this.togglePlanetModal();
           e.preventDefault();
         }
       }
@@ -524,6 +537,161 @@ export class Overlay {
     } else {
       // Remote player ejected
       this.addLogItem(`🚨 Pilot [${targetId.slice(0, 6)}] was ejected into deep space!`, true);
+    }
+  }
+
+  setupPlanetModal() {
+    if (this.hudBuildBtn) {
+      this.hudBuildBtn.addEventListener("click", () => {
+        this.togglePlanetModal();
+      });
+    }
+
+    // Form cards selector
+    const formCards = document.querySelectorAll("#planet-form-grid .planet-form-card");
+    formCards.forEach((card) => {
+      card.addEventListener("click", () => {
+        formCards.forEach((c) => c.classList.remove("selected"));
+        card.classList.add("selected");
+      });
+    });
+
+    // Color Swatches
+    const colorSwatches = document.querySelectorAll("#planet-color-swatches .color-swatch");
+    colorSwatches.forEach((swatch) => {
+      swatch.addEventListener("click", () => {
+        colorSwatches.forEach((s) => s.classList.remove("selected"));
+        swatch.classList.add("selected");
+      });
+    });
+
+    // Atmosphere Swatches
+    const atmoSwatches = document.querySelectorAll("#planet-atmo-swatches .color-swatch");
+    atmoSwatches.forEach((swatch) => {
+      swatch.addEventListener("click", () => {
+        atmoSwatches.forEach((s) => s.classList.remove("selected"));
+        swatch.classList.add("selected");
+      });
+    });
+
+    // Size Pills
+    const sizePills = document.querySelectorAll("#planet-size-pills .option-pill");
+    sizePills.forEach((pill) => {
+      pill.addEventListener("click", () => {
+        sizePills.forEach((p) => p.classList.remove("selected"));
+        pill.classList.add("selected");
+      });
+    });
+
+    // Ring Pills
+    const ringPills = document.querySelectorAll("#planet-ring-pills .option-pill");
+    ringPills.forEach((pill) => {
+      pill.addEventListener("click", () => {
+        ringPills.forEach((p) => p.classList.remove("selected"));
+        pill.classList.add("selected");
+      });
+    });
+
+    // Moon Pills
+    const moonPills = document.querySelectorAll("#planet-moon-pills .option-pill");
+    moonPills.forEach((pill) => {
+      pill.addEventListener("click", () => {
+        moonPills.forEach((p) => p.classList.remove("selected"));
+        pill.classList.add("selected");
+      });
+    });
+
+    // Placement Pills
+    const placementPills = document.querySelectorAll("#planet-placement-pills .option-pill");
+    placementPills.forEach((pill) => {
+      pill.addEventListener("click", () => {
+        placementPills.forEach((p) => p.classList.remove("selected"));
+        pill.classList.add("selected");
+      });
+    });
+
+    // Forge Button
+    const forgeBtn = document.getElementById("planet-forge-btn");
+    if (forgeBtn) {
+      forgeBtn.addEventListener("click", () => {
+        const nameInput = document.getElementById("planet-name-input");
+        const customUrlInput = document.getElementById("planet-custom-url");
+        const selectedFormCard = document.querySelector("#planet-form-grid .planet-form-card.selected");
+        const selectedColorSwatch = document.querySelector("#planet-color-swatches .color-swatch.selected");
+        const selectedAtmoSwatch = document.querySelector("#planet-atmo-swatches .color-swatch.selected");
+        const selectedSizePill = document.querySelector("#planet-size-pills .option-pill.selected");
+        const selectedRingPill = document.querySelector("#planet-ring-pills .option-pill.selected");
+        const selectedMoonPill = document.querySelector("#planet-moon-pills .option-pill.selected");
+        const selectedPlacementPill = document.querySelector("#planet-placement-pills .option-pill.selected");
+
+        const planetName = nameInput?.value.trim() || `World-${Math.floor(100 + Math.random() * 900)}`;
+        const form = selectedFormCard?.dataset.form || "terrestrial";
+        const primaryColor = selectedColorSwatch?.dataset.color || "#00f0ff";
+        const secondaryColor = selectedAtmoSwatch?.dataset.color || "#9d00ff";
+        const radius = Number(selectedSizePill?.dataset.radius) || 35;
+        const rings = selectedRingPill?.dataset.rings || "single";
+        const moons = Number(selectedMoonPill?.dataset.moons) || 1;
+        const placement = selectedPlacementPill?.dataset.placement || "forward";
+        const customModelUrl = customUrlInput?.value.trim() || "";
+
+        const config = {
+          name: planetName,
+          form,
+          primaryColor,
+          secondaryColor,
+          radius,
+          rings,
+          moons,
+          placement,
+          hasAtmosphere: true,
+          customModelUrl,
+        };
+
+        if (this.onBuildPlanetCallback) {
+          this.onBuildPlanetCallback(config);
+        }
+
+        this.addLogItem(`🪐 Initiating cosmic genesis: "${planetName}" [${form.toUpperCase()}]...`);
+        this.closePlanetModal();
+      });
+    }
+
+    const closeBtn = document.getElementById("planet-close-btn");
+    const cancelBtn = document.getElementById("planet-cancel-btn");
+    [closeBtn, cancelBtn].forEach((btn) => {
+      if (btn) btn.addEventListener("click", () => this.closePlanetModal());
+    });
+  }
+
+  togglePlanetModal() {
+    if (!this.planetModal) return;
+    if (this.planetModal.style.display === "block") {
+      this.closePlanetModal();
+    } else {
+      this.openPlanetModal();
+    }
+  }
+
+  openPlanetModal() {
+    if (!this.planetModal) return;
+    if (document.pointerLockElement) {
+      document.exitPointerLock();
+    }
+    this.closeMorphModal();
+    this.closeStarmapModal();
+    this.planetModal.style.display = "block";
+    const nameInput = document.getElementById("planet-name-input");
+    if (nameInput && !nameInput.value) {
+      const presets = ["Nova Prime", "Aethelgard", "Cyberia", "Verdant Echo", "Chronos Ring", "Solaris IV", "Opal Oasis"];
+      nameInput.value = presets[Math.floor(Math.random() * presets.length)];
+    }
+  }
+
+  closePlanetModal() {
+    if (!this.planetModal) return;
+    this.planetModal.style.display = "none";
+    if (this.isEntered) {
+      document.getElementById("webgl-canvas")?.requestPointerLock();
     }
   }
 

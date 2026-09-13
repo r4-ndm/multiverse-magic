@@ -115,6 +115,19 @@ export class NetworkSystem {
     this.room.onMessage("player_left", (data) => {
       if (this.onLogEvent) this.onLogEvent(`Pilot [${data.id.slice(0, 6)}] left space`);
     });
+
+    // Persistent Planet Handlers
+    this.room.onMessage("planets_sync", (planets) => {
+      if (this.onPlanetsSync) this.onPlanetsSync(planets);
+    });
+
+    this.room.onMessage("planet_created", (planetData) => {
+      if (this.onPlanetCreated) this.onPlanetCreated(planetData);
+    });
+
+    this.room.onMessage("planet_deleted", (data) => {
+      if (this.onPlanetDeleted) this.onPlanetDeleted(data.id);
+    });
   }
 
   /**
@@ -163,5 +176,15 @@ export class NetworkSystem {
   sendSetName(name) {
     if (!this.room) return;
     this.room.send("set_name", name);
+  }
+
+  sendBuildPlanet(planetData) {
+    if (!this.room) return;
+    this.room.send("build_planet", planetData);
+  }
+
+  sendDeletePlanet(planetId) {
+    if (!this.room) return;
+    this.room.send("delete_planet", { id: planetId });
   }
 }

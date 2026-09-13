@@ -1,7 +1,14 @@
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import colyseus from "colyseus";
 import { Player, SpaceState } from "../schema/Player.js";
 
 const { Room } = colyseus;
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PLANETS_FILE = path.join(__dirname, "..", "data", "planets.json");
 
 export class SpaceRoom extends Room {
   maxClients = 64;
@@ -10,6 +17,8 @@ export class SpaceRoom extends Room {
     this.setState(new SpaceState());
     this.lastShootTimes = new Map(); // sessionId -> timestamp
     this.lastDamageTimes = new Map(); // sessionId -> timestamp
+    this.planets = new Map(); // planetId -> planetData
+    this.loadPlanets();
 
     console.log(`[SpaceRoom] Created room with id: ${this.roomId}`);
 
@@ -108,6 +117,61 @@ export class SpaceRoom extends Room {
         color: player.color,
         avatarUrl: player.avatarUrl,
       });
+    });
+
+    // Dynamic planet builder handler
+    this.onMessage("build_planet", (client, data) => {
+      const player = this.state.players.get(client.sessionId);
+      const builderName = player?.name || `Pilot-${client.sessionId.slice(0, 4)}`;
+
+      const planetId = `planet_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const planetData = {
+        id: planetId,
+        name: String(data.name || "New Planet").trim().slice(0, 24),
+        builderId: client.sessionId,
+        builderName: builderName,
+        form: String(data.form || "terrestrial"),
+        radius: Math.max(12, Math.min(80, Number(data.radius) || 30)),
+        primaryColor: String(data.primaryColor || "#00f0ff"),
+        secondaryColor: String(data.secondaryColor || "#9d00ff"),
+        rings: String(data.rings || "single"),
+        moons: Math.max(0, Math.min(4, Number(data.moons) || 1)),
+        hasAtmosphere: data.hasAtmosphere !== false,
+        customModelUrl: typeof data.customModelUrl === "string" ? data.customModelUrl.trim() : "",
+        position: {
+          x: Math.round(Number(data.position?.x) || 0),
+          y: Math.round(Number(data.position?.y) || -40),
+          z: Math.round(Number(data.position?.z) || -160),
+        },
+        createdAt: Date.now(),
+      };
+
+      this.planets.set(planetId, planetData);
+      this.savePlanets();
+
+      console.log(`[SpaceRoom] Pilot [${builderName}] forged new planet: "${planetData.name}" (${planetData.form}) at (${planetData.position.x}, ${planetData.position.y}, ${planetData.position.z})`);
+
+      // Broadcast new planet to all connected clients
+      this.broadcast("planet_created", planetData);
+
+      // System chat broadcast
+      this.broadcast("chat", {
+        senderId: "COSMOS",
+        senderName: "🪐 COSMOS",
+        text: `Pilot [${builderName}] forged a new world: "${planetData.name}" [${planetData.form.toUpperCase()}]!`,
+        timestamp: Date.now(),
+      });
+    });
+
+    // Delete planet handler (if builder chooses)
+    this.onMessage("delete_planet", (client, data) => {
+      if (!data || !data.id) return;
+      const planet = this.planets.get(data.id);
+      if (planet && (planet.builderId === client.sessionId || client.sessionId === "admin")) {
+        this.planets.delete(data.id);
+        this.savePlanets();
+        this.broadcast("planet_deleted", { id: data.id });
+      }
     });
 
     // Health regeneration loop: +1 HP per second when not taking damage
@@ -225,6 +289,58 @@ export class SpaceRoom extends Room {
       },
       { except: client }
     );
+
+    // Synchronize all persistent planets in the sector to the joining client
+    client.send("planets_sync", Array.from(this.planets.values()));
+  }
+
+  loadPlanets() {
+    try {
+      if (fs.existsSync(PLANETS_FILE)) {
+        const raw = fs.readFileSync(PLANETS_FILE, "utf8");
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) {
+          list.forEach((p) => {
+            if (p && p.id) this.planets.set(p.id, p);
+          });
+          console.log(`[SpaceRoom] Loaded ${this.planets.size} persistent planets from disk.`);
+        }
+      }
+    } catch (err) {
+      console.warn("[SpaceRoom] Error loading planets file:", err);
+    }
+
+    // If no planets exist, seed with iconic landmarks
+    if (this.planets.size === 0) {
+      const defaultPlanet = {
+        id: "planet_prime_aethelgard",
+        name: "Aethelgard Prime",
+        builderId: "SYSTEM",
+        builderName: "Multiverse Core",
+        form: "ringed_giant",
+        radius: 38,
+        primaryColor: "#00f0ff",
+        secondaryColor: "#9d00ff",
+        rings: "double",
+        moons: 2,
+        hasAtmosphere: true,
+        position: { x: -90, y: -80, z: -280 },
+        createdAt: Date.now(),
+      };
+      this.planets.set(defaultPlanet.id, defaultPlanet);
+      this.savePlanets();
+    }
+  }
+
+  savePlanets() {
+    try {
+      const list = Array.from(this.planets.values());
+      const dir = path.dirname(PLANETS_FILE);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(PLANETS_FILE, JSON.stringify(list, null, 2), "utf8");
+    } catch (err) {
+      console.warn("[SpaceRoom] Error saving planets file:", err);
+    }
   }
 
   onLeave(client, consented) {

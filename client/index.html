@@ -650,6 +650,15 @@
       background: rgba(168, 85, 247, 0.2);
       box-shadow: 0 0 16px rgba(168, 85, 247, 0.6);
     }
+    #hud-build-btn {
+      border-color: #00ff88;
+      color: #00ff88;
+      box-shadow: 0 0 10px rgba(0, 255, 136, 0.25);
+    }
+    #hud-build-btn:hover {
+      background: rgba(0, 255, 136, 0.2);
+      box-shadow: 0 0 16px rgba(0, 255, 136, 0.6);
+    }
 
     /* Jump Gate Proximity Banner */
     #jumpgate-proximity-banner {
@@ -783,6 +792,107 @@
       gap: 10px;
       margin-top: 8px;
     }
+
+    /* Planet Forge Modal */
+    #planet-modal {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 660px;
+      max-width: 92vw;
+      max-height: 88vh;
+      overflow-y: auto;
+      background: rgba(8, 12, 24, 0.96);
+      border: 1px solid #00ff88;
+      box-shadow: 0 0 45px rgba(0, 255, 136, 0.35);
+      border-radius: 14px;
+      padding: 24px;
+      z-index: 60;
+      display: none;
+      backdrop-filter: blur(16px);
+      pointer-events: auto;
+    }
+    #planet-modal h3 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 18px;
+      color: #00ff88;
+      letter-spacing: 1.5px;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .planet-form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .planet-form-card {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 10px 8px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .planet-form-card:hover {
+      border-color: #00ff88;
+      background: rgba(0, 255, 136, 0.08);
+      transform: translateY(-2px);
+    }
+    .planet-form-card.selected {
+      border-color: #00ff88;
+      background: rgba(0, 255, 136, 0.18);
+      box-shadow: 0 0 12px rgba(0, 255, 136, 0.35);
+    }
+    .planet-form-card .icon {
+      font-size: 22px;
+    }
+    .planet-form-card .name {
+      font-weight: 700;
+      font-size: 11px;
+      color: #e0f2fe;
+    }
+    .planet-form-card .desc {
+      font-size: 9px;
+      color: #94a3b8;
+    }
+    .option-pill-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+    .option-pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #cbd5e1;
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .option-pill:hover {
+      background: rgba(0, 255, 136, 0.15);
+      border-color: #00ff88;
+      color: #ffffff;
+    }
+    .option-pill.selected {
+      background: #00ff88;
+      color: #050811;
+      border-color: #00ff88;
+      font-weight: 700;
+      box-shadow: 0 0 12px rgba(0, 255, 136, 0.4);
+    }
   </style>
 </head>
 <body>
@@ -841,7 +951,7 @@
       </div>
       <div class="keybind-hint">
         WASD: Fly & Strafe | Space/C: Ascend/Descend<br/>
-        Left Click / F: Shoot | V: View | J: Starmap/Jump | H: Morph | Tab: Cursor
+        Left Click / F: Shoot | V: View | B: Build Planet | J: Starmap | H: Morph | Tab: Cursor
       </div>
     </div>
 
@@ -849,7 +959,8 @@
     <div id="hud-action-bar">
       <button id="hud-camera-btn" class="hud-action-btn">🎯 1ST PERSON [V]</button>
       <button id="hud-morph-btn" class="hud-action-btn">🎭 MORPH [H]</button>
-      <button id="hud-starmap-btn" class="hud-action-btn">🪐 STARMAP [J]</button>
+      <button id="hud-build-btn" class="hud-action-btn">🪐 BUILD PLANET [B]</button>
+      <button id="hud-starmap-btn" class="hud-action-btn">🚀 STARMAP [J]</button>
     </div>
 
     <!-- Floating Jump Gate Proximity Banner -->
@@ -886,7 +997,140 @@
       <div class="share-url-row">
         <input type="text" id="my-system-beacon-url" readonly class="custom-avatar-input" style="flex:1;" />
         <button id="copy-beacon-btn" class="hud-action-btn" style="position:static; border-color:#ffd700; color:#ffd700;">COPY BEACON</button>
+    </div>
+  </div>
+
+  <!-- Planet Builder / Celestial Forge Modal -->
+  <div id="planet-modal">
+    <div class="starmap-header">
+      <div>
+        <h3>🪐 CELESTIAL FORGE // BUILD A PLANET</h3>
+        <p style="font-size:12px; color:#94a3b8; margin-top:4px;">
+          Forge a persistent celestial body in any form into this solar system.
+        </p>
       </div>
+      <button id="planet-close-btn" style="background:none; border:none; color:#8fa0c0; font-size:24px; cursor:pointer; padding:0 6px;">&times;</button>
+    </div>
+
+    <span class="section-label">1. PLANET DESIGNATION // NAME</span>
+    <input type="text" class="custom-avatar-input" id="planet-name-input" placeholder="e.g. Arcadia Prime, Cyberia, Nova Haven..." maxlength="24" />
+
+    <span class="section-label">2. CHOOSE PLANET FORM // ARCHETYPE</span>
+    <div class="planet-form-grid" id="planet-form-grid">
+      <div class="planet-form-card selected" data-form="terrestrial">
+        <span class="icon">🌍</span>
+        <span class="name">Terrestrial</span>
+        <span class="desc">Continents & Clouds</span>
+      </div>
+      <div class="planet-form-card" data-form="ringed_giant">
+        <span class="icon">🪐</span>
+        <span class="name">Ringed Giant</span>
+        <span class="desc">Banded Gas & Rings</span>
+      </div>
+      <div class="planet-form-card" data-form="crystal_prism">
+        <span class="icon">💎</span>
+        <span class="name">Crystal Prism</span>
+        <span class="desc">Faceted Refracting Core</span>
+      </div>
+      <div class="planet-form-card" data-form="torus_world">
+        <span class="icon">🍩</span>
+        <span class="name">Torus Ringworld</span>
+        <span class="desc">Hollow Megastructure</span>
+      </div>
+      <div class="planet-form-card" data-form="cyber_sphere">
+        <span class="icon">⚡</span>
+        <span class="name">Cyber Sphere</span>
+        <span class="desc">Mecha Hull & Laser Trench</span>
+      </div>
+      <div class="planet-form-card" data-form="molten_core">
+        <span class="icon">🌋</span>
+        <span class="name">Molten Core</span>
+        <span class="desc">Cracked Fiery Crust</span>
+      </div>
+      <div class="planet-form-card" data-form="dyson_sphere">
+        <span class="icon">☀️</span>
+        <span class="name">Dyson Sphere</span>
+        <span class="desc">Orbital Cage & Star Core</span>
+      </div>
+      <div class="planet-form-card" data-form="cube_world">
+        <span class="icon">🧊</span>
+        <span class="name">Cubic World</span>
+        <span class="desc">Cosmic Voxel Cube</span>
+      </div>
+    </div>
+
+    <span class="section-label">3. PRIMARY SURFACE COLOR</span>
+    <div class="color-swatches-row" id="planet-color-swatches">
+      <div class="color-swatch selected" data-color="#00f0ff" style="background:#00f0ff;" title="Cyan"></div>
+      <div class="color-swatch" data-color="#00ff88" style="background:#00ff88;" title="Emerald"></div>
+      <div class="color-swatch" data-color="#ffd700" style="background:#ffd700;" title="Solar Gold"></div>
+      <div class="color-swatch" data-color="#9d00ff" style="background:#9d00ff;" title="Purple"></div>
+      <div class="color-swatch" data-color="#ff0055" style="background:#ff0055;" title="Crimson"></div>
+      <div class="color-swatch" data-color="#ff6600" style="background:#ff6600;" title="Amber"></div>
+      <div class="color-swatch" data-color="#38bdf8" style="background:#38bdf8;" title="Ice Blue"></div>
+      <div class="color-swatch" data-color="#ffffff" style="background:#ffffff;" title="White"></div>
+    </div>
+
+    <span class="section-label">4. ATMOSPHERE & RING GLOW COLOR</span>
+    <div class="color-swatches-row" id="planet-atmo-swatches">
+      <div class="color-swatch" data-color="#00f0ff" style="background:#00f0ff;" title="Cyan"></div>
+      <div class="color-swatch" data-color="#00ff88" style="background:#00ff88;" title="Emerald"></div>
+      <div class="color-swatch selected" data-color="#9d00ff" style="background:#9d00ff;" title="Purple"></div>
+      <div class="color-swatch" data-color="#ffd700" style="background:#ffd700;" title="Solar Gold"></div>
+      <div class="color-swatch" data-color="#ff0055" style="background:#ff0055;" title="Crimson"></div>
+    </div>
+
+    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+      <div style="flex: 1; min-width: 180px;">
+        <span class="section-label">5. PLANET SCALE // SIZE</span>
+        <div class="option-pill-group" id="planet-size-pills">
+          <div class="option-pill" data-radius="20">Small (20u)</div>
+          <div class="option-pill selected" data-radius="35">Medium (35u)</div>
+          <div class="option-pill" data-radius="55">Colossal (55u)</div>
+        </div>
+      </div>
+
+      <div style="flex: 1; min-width: 180px;">
+        <span class="section-label">6. RING SYSTEM</span>
+        <div class="option-pill-group" id="planet-ring-pills">
+          <div class="option-pill" data-rings="none">None</div>
+          <div class="option-pill selected" data-rings="single">Single Ring</div>
+          <div class="option-pill" data-rings="double">Gyro Double</div>
+          <div class="option-pill" data-rings="asteroid_belt">Asteroid Belt</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+      <div style="flex: 1; min-width: 180px;">
+        <span class="section-label">7. ORBITING MOONS</span>
+        <div class="option-pill-group" id="planet-moon-pills">
+          <div class="option-pill" data-moons="0">No Moons</div>
+          <div class="option-pill selected" data-moons="1">1 Moon</div>
+          <div class="option-pill" data-moons="2">2 Moons</div>
+          <div class="option-pill" data-moons="3">3 Moons</div>
+        </div>
+      </div>
+
+      <div style="flex: 1; min-width: 180px;">
+        <span class="section-label">8. PLACEMENT</span>
+        <div class="option-pill-group" id="planet-placement-pills">
+          <div class="option-pill selected" data-placement="forward">Ahead in View (110u)</div>
+          <div class="option-pill" data-placement="exact">At Current Position</div>
+        </div>
+      </div>
+    </div>
+
+    <details style="margin-top: 10px; margin-bottom: 16px; text-align: left; cursor: pointer;">
+      <summary style="font-size: 11px; color: #00ff88; font-weight: 600; outline: none; margin-bottom: 8px;">
+        ⚙️ Advanced: Load Custom 3D Model (.GLB URL)
+      </summary>
+      <input type="text" class="custom-avatar-input" id="planet-custom-url" placeholder="https://example.com/custom_planet.glb" style="margin-top: 6px;" />
+    </details>
+
+    <div class="morph-modal-actions">
+      <button class="morph-btn morph-apply-btn" id="planet-forge-btn" style="background: linear-gradient(135deg, #00ff88, #00f0ff); color: #050811;">🌌 FORGE PLANET</button>
+      <button class="morph-btn morph-close-btn" id="planet-cancel-btn">CANCEL</button>
     </div>
   </div>
 

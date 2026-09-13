@@ -453,6 +453,33 @@ export class AudioSystem {
     this.playWhooshSound();
   }
 
+  /**
+   * Synthesizes a celestial Genesis chime when a new planet is forged.
+   */
+  playPlanetSpawnSound() {
+    if (!this.audioContext) return;
+    const now = this.audioContext.currentTime;
+
+    // Harmonic celestial frequencies (Root, 5th, Octave, 9th)
+    [110, 164.81, 220, 329.63, 493.88].forEach((freq, idx) => {
+      const osc = this.audioContext.createOscillator();
+      const gain = this.audioContext.createGain();
+
+      osc.type = idx === 0 ? "sawtooth" : "sine";
+      osc.frequency.setValueAtTime(freq, now);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.3 / (idx + 1), now + 0.15 + idx * 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 3.0);
+
+      osc.connect(gain);
+      gain.connect(this.audioContext.destination);
+
+      osc.start(now);
+      osc.stop(now + 3.2);
+    });
+  }
+
   startAmbientDrone() {
     if (!this.audioContext) return;
     const now = this.audioContext.currentTime;

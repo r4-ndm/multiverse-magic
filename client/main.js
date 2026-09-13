@@ -5,6 +5,7 @@ import { NetworkSystem } from "./systems/NetworkSystem.js";
 import { AudioSystem } from "./systems/AudioSystem.js";
 import { CombatSystem } from "./systems/CombatSystem.js";
 import { WorldSystem, PlanetBeacon, HyperlaneGate } from "./systems/WorldObject.js";
+import { CustomPlanet } from "./systems/Planet.js";
 import { Overlay } from "./ui/Overlay.js";
 
 /**
@@ -117,7 +118,19 @@ class OpenSpaceApp {
       },
       this.hyperlaneGate,
       this.playerSystem,
-      this.audioSystem
+      this.audioSystem,
+      (planetConfig) => {
+        let spawnPos;
+        if (planetConfig.placement === "exact") {
+          spawnPos = this.playerSystem.position.clone();
+        } else {
+          // 120 units ahead along ship's heading vector
+          const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.playerSystem.quaternion);
+          spawnPos = this.playerSystem.position.clone().add(forward.multiplyScalar(120));
+        }
+        planetConfig.position = { x: spawnPos.x, y: spawnPos.y, z: spawnPos.z };
+        this.networkSystem.sendBuildPlanet(planetConfig);
+      }
     );
 
     // 4. Start Render Loop
@@ -285,6 +298,32 @@ class OpenSpaceApp {
     // 8. General event logs
     this.networkSystem.onLogEvent = (msg) => {
       this.overlay.addLogItem(msg);
+    };
+
+    // 9. Persistent Planet Synchronization
+    this.networkSystem.onPlanetsSync = (planets) => {
+      console.log(`[OpenSpaceApp] Received ${planets?.length || 0} persistent planets.`);
+      if (Array.isArray(planets)) {
+        planets.forEach((pData) => {
+          if (pData && pData.id && !this.worldSystem.objects.has(pData.id)) {
+            const planet = new CustomPlanet(pData);
+            this.worldSystem.register(planet);
+          }
+        });
+      }
+    };
+
+    this.networkSystem.onPlanetCreated = (pData) => {
+      if (pData && pData.id && !this.worldSystem.objects.has(pData.id)) {
+        const planet = new CustomPlanet(pData);
+        this.worldSystem.register(planet);
+        this.audioSystem?.playPlanetSpawnSound();
+        this.overlay.addLogItem(`🪐 [GENESIS] Pilot [${pData.builderName}] forged new planet: "${pData.name}"!`);
+      }
+    };
+
+    this.networkSystem.onPlanetDeleted = (planetId) => {
+      this.worldSystem.unregister(planetId);
     };
   }
 
