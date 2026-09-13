@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { characterRegistry } from "../characters/index.js";
 
 /**
  * PlayerSystem manages the local player's controls, space flight physics (with inertia),
@@ -693,6 +694,9 @@ export class PlayerSystem {
    * Unified character factory supporting all multiverse character types.
    */
   createCharacterMesh(type = "wizard", accentColor = 0x9d00ff) {
+    if (characterRegistry.has(type)) {
+      return characterRegistry.createMesh(type, accentColor);
+    }
     switch (type) {
       case "wizard":
       case "mage":

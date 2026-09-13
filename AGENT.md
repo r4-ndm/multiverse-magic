@@ -55,10 +55,24 @@ The AI bot will:
 
 ---
 
+## ⚡ Task 4: "Build a custom character / avatar"
+When the user asks you to build or customize a character (e.g. "make me a cyberpunk ninja", "make a dragon", "make a robot with hammer"):
+
+1. Run the character scaffolder:
+```bash
+npm run create-character -- <id> "<Name>" "<Emoji>" "<Description>" "<DefaultColorHex>"
+```
+2. Open `client/characters/<id>.js` and customize the 3D geometry in `createMesh(THREE, accentColor)`.
+3. The character will **automatically appear in the Entry screen grid and the In-Game Morph modal (`H`)** without modifying any HTML or CSS files!
+4. See [`CHARACTERS.md`](./CHARACTERS.md) for full geometry recipes and copy-paste prompt examples.
+
+---
+
 ## 📡 Core Network & Architecture Reference
 
 - **Frontend:** Three.js + Vite (`client/`)
 - **Backend:** Colyseus state synchronization + WebRTC signaling (`server/`)
+- **Character Registry:** Modular plugin system in `client/characters/` (see `CHARACTERS.md`)
 - **WebRTC Spatial Radius:** 50 units (managed in `client/systems/AudioSystem.js`)
 - **Laser Cooldown:** 500ms
 - **Ejection Coordinates:** `(10000, 10000, 10000)` triggered upon reaching 0 HP

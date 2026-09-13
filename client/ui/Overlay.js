@@ -1,3 +1,5 @@
+import { characterRegistry } from "../characters/index.js";
+
 /**
  * Overlay manages user interface modals, HUD updates, event log entries,
  * damage indicators, and ejection announcements.
@@ -102,16 +104,57 @@ export class Overlay {
     });
   }
 
-  setupCharacterSelectors() {
-    // Entry Screen Avatar Cards
-    const entryCards = document.querySelectorAll("#entry-avatar-grid .avatar-card");
-    entryCards.forEach((card) => {
-      card.addEventListener("click", () => {
-        entryCards.forEach((c) => c.classList.remove("selected"));
-        card.classList.add("selected");
-        this.selectedCharacterType = card.dataset.type || "astronaut";
+  renderCharacterGrids() {
+    const characters = characterRegistry.getAll();
+    const entryGrid = document.getElementById("entry-avatar-grid");
+    const morphGrid = document.getElementById("morph-avatar-grid");
+
+    const populate = (container, isMorph = false) => {
+      if (!container) return;
+      container.innerHTML = "";
+      characters.forEach((char) => {
+        const isSelected = char.id === this.selectedCharacterType;
+        const card = document.createElement("div");
+        card.className = `avatar-card ${isSelected ? "selected" : ""}`;
+        card.dataset.type = char.id;
+        card.innerHTML = `
+          <span class="icon">${char.emoji || "👤"}</span>
+          <span class="name">${char.name || char.id}</span>
+          <span class="desc">${char.description || "Custom Form"}</span>
+        `;
+        card.addEventListener("click", () => {
+          container.querySelectorAll(".avatar-card").forEach((c) => c.classList.remove("selected"));
+          card.classList.add("selected");
+          if (!isMorph) {
+            this.selectedCharacterType = char.id;
+            if (char.defaultColor) {
+              this.selectColor(char.defaultColor, false);
+            }
+          }
+        });
+        container.appendChild(card);
       });
+    };
+
+    populate(entryGrid, false);
+    populate(morphGrid, true);
+  }
+
+  selectColor(colorHex, isMorph = false) {
+    const prefix = isMorph ? "#morph-color-swatches" : "#entry-color-swatches";
+    const swatches = document.querySelectorAll(`${prefix} .color-swatch`);
+    swatches.forEach((s) => {
+      if (s.dataset.color.toLowerCase() === colorHex.toLowerCase()) {
+        s.classList.add("selected");
+      } else {
+        s.classList.remove("selected");
+      }
     });
+    if (!isMorph) this.selectedColor = colorHex;
+  }
+
+  setupCharacterSelectors() {
+    this.renderCharacterGrids();
 
     // Entry Screen Color Swatches
     const entrySwatches = document.querySelectorAll("#entry-color-swatches .color-swatch");
@@ -130,15 +173,6 @@ export class Overlay {
         this.toggleMorphModal();
       });
     }
-
-    // Morph Modal Avatar Cards
-    const morphCards = document.querySelectorAll("#morph-avatar-grid .avatar-card");
-    morphCards.forEach((card) => {
-      card.addEventListener("click", () => {
-        morphCards.forEach((c) => c.classList.remove("selected"));
-        card.classList.add("selected");
-      });
-    });
 
     // Morph Modal Color Swatches
     const morphSwatches = document.querySelectorAll("#morph-color-swatches .color-swatch");
