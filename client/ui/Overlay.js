@@ -114,12 +114,23 @@ export class Overlay {
       this.hud.style.display = "block";
       if (this.crosshair) this.crosshair.style.display = "block";
 
+      // Explicitly blur any input that might still have focus
+      document.activeElement?.blur();
+      this.pilotNameInput?.blur();
+      this.chatInput?.blur();
+
       // Request pointer lock right from the entry click gesture
-      document.getElementById("webgl-canvas")?.requestPointerLock();
+      const canvas = document.getElementById("webgl-canvas");
+      canvas?.focus();
+      canvas?.requestPointerLock();
     });
 
-    // Chat enter key toggle & H key morph toggle
+    // Chat enter key toggle & HUD key shortcuts
     window.addEventListener("keydown", (e) => {
+      const isInput = document.activeElement === this.chatInput || 
+                      document.activeElement?.tagName === "INPUT" || 
+                      document.activeElement?.tagName === "TEXTAREA";
+
       if (e.code === "Enter") {
         if (document.activeElement === this.chatInput) {
           const text = this.chatInput.value.trim();
@@ -128,7 +139,7 @@ export class Overlay {
           }
           this.chatInput.value = "";
           this.chatInput.blur();
-          // Resume pointer lock
+          document.getElementById("webgl-canvas")?.focus();
           document.getElementById("webgl-canvas")?.requestPointerLock();
         } else if (this.isEntered) {
           if (document.pointerLockElement) {
@@ -137,27 +148,35 @@ export class Overlay {
           this.chatInput.focus();
           e.preventDefault();
         }
-      } else if (e.code === "KeyH" && this.isEntered) {
-        // Toggle Morph Modal with H key when not typing in chat or input
-        if (document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
-          this.toggleMorphModal();
-          e.preventDefault();
-        }
-      } else if (e.code === "KeyB" && this.isEntered) {
-        // Toggle Planet Forge Modal with B key when not typing in chat or input
-        if (document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
-          this.togglePlanetModal();
-          e.preventDefault();
-        }
-      } else if (e.code === "KeyE" && this.isEntered) {
-        // Toggle Cosmic TV modal with E key
-        if (document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
-          this.toggleCosmicTVModal();
-          e.preventDefault();
-        }
-      } else if (e.code === "Escape") {
+        return;
+      }
+
+      // If user is actively typing in a text field, do not trigger game modals
+      if (isInput) return;
+
+      const isH = e.code === "KeyH" || e.key === "h" || e.key === "H" || e.keyCode === 72;
+      const isB = e.code === "KeyB" || e.key === "b" || e.key === "B" || e.keyCode === 66;
+      const isE = e.code === "KeyE" || e.key === "e" || e.key === "E" || e.keyCode === 69;
+      const isEsc = e.code === "Escape" || e.key === "Escape" || e.keyCode === 27;
+
+      if (isH) {
+        this.toggleMorphModal();
+        e.preventDefault();
+      } else if (isB) {
+        this.togglePlanetModal();
+        e.preventDefault();
+      } else if (isE) {
+        this.toggleCosmicTVModal();
+        e.preventDefault();
+      } else if (isEsc) {
         if (this.cosmicTvModal && (this.cosmicTvModal.style.display === "flex" || this.cosmicTvModal.style.display === "block")) {
           this.closeCosmicTVModal();
+        } else if (this.planetModal && this.planetModal.style.display === "block") {
+          this.closePlanetModal();
+        } else if (this.morphModal && this.morphModal.style.display === "block") {
+          this.closeMorphModal();
+        } else if (this.starmapModal && this.starmapModal.style.display === "block") {
+          this.closeStarmapModal();
         }
       }
     });

@@ -32,6 +32,7 @@ class OpenSpaceApp {
     this.cosmicTV = null;
 
     this.isEntered = false;
+    window.multiverseApp = this;
   }
 
   async start() {
@@ -85,14 +86,17 @@ class OpenSpaceApp {
 
     // Keyboard trigger: KeyJ for Hyperdrive Jump or Starmap
     window.addEventListener("keydown", (e) => {
-      if (e.code === "KeyJ" && !e.repeat) {
-        if (document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
-          if (this.hyperlaneGate?.isNearGate(this.playerSystem?.position)) {
-            this.hyperlaneGate.engageJump(this.playerSystem, this.audioSystem, this.overlay);
-          } else {
-            this.overlay.toggleStarmapModal();
-          }
+      if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") {
+        return;
+      }
+      const isJ = e.code === "KeyJ" || e.key === "j" || e.key === "J" || e.keyCode === 74;
+      if (isJ && !e.repeat) {
+        if (this.hyperlaneGate?.isNearGate(this.playerSystem?.position)) {
+          this.hyperlaneGate.engageJump(this.playerSystem, this.audioSystem, this.overlay);
+        } else {
+          this.overlay?.toggleStarmapModal();
         }
+        e.preventDefault();
       }
     });
 
@@ -404,5 +408,6 @@ class OpenSpaceApp {
 // Bootstrap application on window load
 window.addEventListener("DOMContentLoaded", () => {
   const app = new OpenSpaceApp();
+  window.multiverseApp = app;
   app.start();
 });

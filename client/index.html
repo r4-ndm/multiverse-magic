@@ -679,7 +679,8 @@
       line-height: 1.5;
       display: none;
       z-index: 30;
-      pointer-events: none;
+      pointer-events: auto;
+      cursor: pointer;
       backdrop-filter: blur(8px);
       animation: pulseGate 2s infinite ease-in-out;
     }
@@ -1124,7 +1125,7 @@
   </style>
 </head>
 <body>
-  <canvas id="webgl-canvas"></canvas>
+  <canvas id="webgl-canvas" tabindex="0"></canvas>
 
   <div id="crosshair">
     <div id="crosshair-center"></div>

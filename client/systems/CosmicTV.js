@@ -325,15 +325,17 @@ export class CosmicTV extends WorldObject {
           this.inRange = true;
           const banner = document.getElementById("jumpgate-proximity-banner");
           if (banner) {
-            banner.innerHTML = `<span style="color:#00f0ff;font-weight:700;">📺 COSMIC TV IN RANGE // PRESS [E] TO TUNE & SURF THE WEB</span>`;
+            banner.innerHTML = `<span style="color:#ffd700;font-weight:700;">📺 COSMIC WEB TV IN RANGE</span><br/><span style="color:#00f0ff;font-size:11px;">CLICK HERE OR PRESS <b>[E]</b> TO TUNE &amp; SURF THE WEB</span>`;
             banner.style.display = "block";
+            banner.onclick = () => this.onInteract(playerSystem);
           }
         }
       } else if (this.inRange) {
         this.inRange = false;
         const banner = document.getElementById("jumpgate-proximity-banner");
-        if (banner && banner.innerHTML.includes("COSMIC TV")) {
+        if (banner && banner.innerHTML.includes("COSMIC")) {
           banner.style.display = "none";
+          banner.onclick = null;
         }
       }
     }
@@ -341,8 +343,13 @@ export class CosmicTV extends WorldObject {
 
   onInteract(playerSystem) {
     // Trigger opening browser terminal
-    if (typeof window !== "undefined" && window.multiverseApp?.overlay) {
-      window.multiverseApp.overlay.openCosmicTVModal();
+    if (typeof window !== "undefined") {
+      if (window.multiverseApp?.overlay) {
+        window.multiverseApp.overlay.openCosmicTVModal();
+      } else {
+        const modal = document.getElementById("cosmic-tv-modal");
+        if (modal) modal.style.display = "flex";
+      }
     }
   }
 }
