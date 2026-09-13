@@ -416,6 +416,43 @@ export class AudioSystem {
     noise.stop(now + duration);
   }
 
+  /**
+   * Synthesizes an epic hyperspace jump / warp sonic boom using Web Audio API.
+   */
+  playWarpSound() {
+    if (!this.audioContext) return;
+    const now = this.audioContext.currentTime;
+    const duration = 2.2;
+
+    // 1. Deep sub-bass charging oscillator ramping up from 45Hz to 340Hz
+    const osc = this.audioContext.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(45, now);
+    osc.frequency.exponentialRampToValueAtTime(360, now + 1.2);
+    osc.frequency.exponentialRampToValueAtTime(50, now + duration);
+
+    const lowpass = this.audioContext.createBiquadFilter();
+    lowpass.type = "lowpass";
+    lowpass.frequency.setValueAtTime(140, now);
+    lowpass.frequency.exponentialRampToValueAtTime(2600, now + 1.2);
+    lowpass.frequency.exponentialRampToValueAtTime(160, now + duration);
+
+    const gain = this.audioContext.createGain();
+    gain.gain.setValueAtTime(0.01, now);
+    gain.gain.linearRampToValueAtTime(0.85, now + 1.1);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+    osc.connect(lowpass);
+    lowpass.connect(gain);
+    gain.connect(this.audioContext.destination);
+
+    osc.start(now);
+    osc.stop(now + duration);
+
+    // 2. High-speed rushing warp noise
+    this.playWhooshSound();
+  }
+
   startAmbientDrone() {
     if (!this.audioContext) return;
     const now = this.audioContext.currentTime;

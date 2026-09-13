@@ -4,7 +4,7 @@ import { PlayerSystem } from "./systems/PlayerSystem.js";
 import { NetworkSystem } from "./systems/NetworkSystem.js";
 import { AudioSystem } from "./systems/AudioSystem.js";
 import { CombatSystem } from "./systems/CombatSystem.js";
-import { WorldSystem, PlanetBeacon } from "./systems/WorldObject.js";
+import { WorldSystem, PlanetBeacon, HyperlaneGate } from "./systems/WorldObject.js";
 import { Overlay } from "./ui/Overlay.js";
 
 /**
@@ -26,6 +26,7 @@ class OpenSpaceApp {
     this.audioSystem = null;
     this.combatSystem = null;
     this.worldSystem = null;
+    this.hyperlaneGate = null;
 
     this.isEntered = false;
   }
@@ -42,8 +43,51 @@ class OpenSpaceApp {
     this.audioSystem = new AudioSystem(camera);
 
     this.worldSystem = new WorldSystem(scene);
-    // Extensibility showcase: register a distant planetoid beacon
+
+    // Read current solar system from URL query parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    this.currentSystemId = urlParams.get("system") || "sol";
+
+    // Configure system theme and jump destination
+    this.currentSystemName = "SOL PRIME";
+    let gateDestName = "VEGA OUTPOST";
+    let gateDestUrl = "/?system=vega";
+    let gateDist = 14.2;
+
+    if (this.currentSystemId === "vega") {
+      this.currentSystemName = "VEGA OUTPOST";
+      gateDestName = "SOL PRIME";
+      gateDestUrl = "/?system=sol";
+      gateDist = 14.2;
+    } else if (this.currentSystemId === "kepler") {
+      this.currentSystemName = "KEPLER VOID";
+      gateDestName = "SOL PRIME";
+      gateDestUrl = "/?system=sol";
+      gateDist = 48.7;
+    } else if (this.currentSystemId === "centauri") {
+      this.currentSystemName = "ALPHA CENTAURI";
+      gateDestName = "SOL PRIME";
+      gateDestUrl = "/?system=sol";
+      gateDist = 4.3;
+    }
+
+    // Register distant planetoid beacon & massive Interstellar Hyperlane Gate
     this.worldSystem.register(new PlanetBeacon("nexus_beacon", new THREE.Vector3(0, -120, -350), 45));
+    this.hyperlaneGate = new HyperlaneGate("main_hyperlane_gate", new THREE.Vector3(0, 15, -150), gateDestName, gateDestUrl, gateDist);
+    this.worldSystem.register(this.hyperlaneGate);
+
+    // Keyboard trigger: KeyJ for Hyperdrive Jump or Starmap
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "KeyJ" && !e.repeat) {
+        if (document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
+          if (this.hyperlaneGate?.isNearGate(this.playerSystem?.position)) {
+            this.hyperlaneGate.engageJump(this.playerSystem, this.audioSystem, this.overlay);
+          } else {
+            this.overlay.toggleStarmapModal();
+          }
+        }
+      }
+    });
 
     // 3. Initialize Overlay UI and entry flow
     this.overlay.init(
@@ -59,7 +103,7 @@ class OpenSpaceApp {
         if (newName && newName !== this.pilotName) {
           this.pilotName = newName;
           this.playerSystem.setLocalName(newName);
-          this.overlay.setPlayerInfo(this.networkSystem.sessionId, this.networkSystem.room?.name, newName);
+          this.overlay.setPlayerInfo(this.networkSystem.sessionId, this.currentSystemName, newName);
           this.networkSystem.sendSetName(newName);
         }
         this.playerSystem.setLocalCharacter(newType, newColor, newUrl);
@@ -70,7 +114,10 @@ class OpenSpaceApp {
       },
       () => {
         this.playerSystem?.toggleCameraMode();
-      }
+      },
+      this.hyperlaneGate,
+      this.playerSystem,
+      this.audioSystem
     );
 
     // 4. Start Render Loop
@@ -105,8 +152,8 @@ class OpenSpaceApp {
         color,
         avatarUrl,
       });
-      this.overlay.setPlayerInfo(room.sessionId, room.name, this.pilotName);
-      this.overlay.addLogItem(`🌌 Pilot [${this.pilotName}] connected to Sector [${room.id}] as [${characterType.toUpperCase()}]`);
+      this.overlay.setPlayerInfo(room.sessionId, this.currentSystemName, this.pilotName);
+      this.overlay.addLogItem(`🌌 Pilot [${this.pilotName}] connected to Sector [${this.currentSystemName}] as [${characterType.toUpperCase()}]`);
 
       this.isEntered = true;
     } catch (err) {
@@ -256,8 +303,15 @@ class OpenSpaceApp {
     // 3. Update combat effects (laser beam lifespan, hit sparks)
     this.combatSystem.update(delta);
 
-    // 4. Update modular world objects
-    this.worldSystem.update(delta, elapsedTime);
+    // 4. Update modular world objects (Hyperlane Jump Gate, planetoids)
+    this.worldSystem.update(
+      delta,
+      elapsedTime,
+      this.playerSystem?.position,
+      this.playerSystem,
+      this.audioSystem,
+      this.overlay
+    );
 
     // 5. If joined universe, sync state and proximity
     if (this.isEntered) {

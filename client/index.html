@@ -632,6 +632,148 @@
       background: rgba(255, 215, 0, 0.2);
       box-shadow: 0 0 16px rgba(255, 215, 0, 0.6);
     }
+    #hud-starmap-btn {
+      border-color: #a855f7;
+      color: #d8b4fe;
+      box-shadow: 0 0 10px rgba(168, 85, 247, 0.25);
+    }
+    #hud-starmap-btn:hover {
+      background: rgba(168, 85, 247, 0.2);
+      box-shadow: 0 0 16px rgba(168, 85, 247, 0.6);
+    }
+
+    /* Jump Gate Proximity Banner */
+    #jumpgate-proximity-banner {
+      position: absolute;
+      top: 76px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(10, 14, 26, 0.92);
+      border: 1px solid var(--neon-cyan);
+      box-shadow: 0 0 24px rgba(0, 240, 255, 0.55);
+      border-radius: 8px;
+      padding: 10px 24px;
+      color: #ffffff;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      text-align: center;
+      line-height: 1.5;
+      display: none;
+      z-index: 30;
+      pointer-events: none;
+      backdrop-filter: blur(8px);
+      animation: pulseGate 2s infinite ease-in-out;
+    }
+    @keyframes pulseGate {
+      0%, 100% { box-shadow: 0 0 16px rgba(0, 240, 255, 0.4); }
+      50% { box-shadow: 0 0 32px rgba(0, 240, 255, 0.85); }
+    }
+
+    /* Hyperspace Warp Tunnel Visual FX */
+    #warp-tunnel-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 100;
+      display: none;
+      background: radial-gradient(circle at center, rgba(0, 240, 255, 0.5) 0%, rgba(157, 0, 255, 0.85) 45%, #000 90%);
+      opacity: 0;
+    }
+    #warp-tunnel-overlay.active {
+      display: block;
+      animation: warpFlash 1.6s ease-in-out forwards;
+    }
+    @keyframes warpFlash {
+      0% { opacity: 0; filter: blur(0px); }
+      35% { opacity: 0.95; filter: blur(4px); }
+      80% { opacity: 1.0; filter: blur(8px); background: #ffffff; }
+      100% { opacity: 1.0; filter: blur(14px); background: #ffffff; }
+    }
+
+    /* Interstellar Starmap Modal */
+    #starmap-modal {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 680px;
+      max-width: 92vw;
+      max-height: 85vh;
+      overflow-y: auto;
+      background: rgba(10, 14, 26, 0.96);
+      border: 1px solid var(--neon-cyan);
+      box-shadow: 0 0 45px rgba(0, 240, 255, 0.35);
+      border-radius: 12px;
+      padding: 24px;
+      z-index: 50;
+      display: none;
+      backdrop-filter: blur(16px);
+      pointer-events: auto;
+    }
+    .starmap-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 18px;
+    }
+    .system-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .system-card {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .system-card:hover {
+      background: rgba(0, 240, 255, 0.08);
+      border-color: var(--neon-cyan);
+      transform: translateY(-2px);
+    }
+    .system-card.current {
+      border-color: var(--neon-green);
+      background: rgba(0, 255, 102, 0.06);
+    }
+    .system-card .sys-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .system-card .sys-desc {
+      font-size: 11px;
+      color: #8fa0c0;
+      line-height: 1.4;
+    }
+    .system-card .sys-meta {
+      font-size: 10px;
+      color: #ffd700;
+      margin-top: 4px;
+    }
+    .custom-system-box {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .share-url-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 8px;
+    }
   </style>
 </head>
 <body>
@@ -690,7 +832,7 @@
       </div>
       <div class="keybind-hint">
         WASD: Fly & Strafe | Space/C: Ascend/Descend<br/>
-        Left Click / F: Shoot | V: 1st/3rd Person | Scroll: Zoom | Tab: Cursor
+        Left Click / F: Shoot | V: View | J: Starmap/Jump | H: Morph | Tab: Cursor
       </div>
     </div>
 
@@ -698,6 +840,44 @@
     <div id="hud-action-bar">
       <button id="hud-camera-btn" class="hud-action-btn">🎯 1ST PERSON [V]</button>
       <button id="hud-morph-btn" class="hud-action-btn">🎭 MORPH [H]</button>
+      <button id="hud-starmap-btn" class="hud-action-btn">🪐 STARMAP [J]</button>
+    </div>
+
+    <!-- Floating Jump Gate Proximity Banner -->
+    <div id="jumpgate-proximity-banner"></div>
+  </div>
+
+  <!-- Hyperspace Warp Tunnel Visual FX -->
+  <div id="warp-tunnel-overlay"></div>
+
+  <!-- Interstellar Starmap Modal -->
+  <div id="starmap-modal">
+    <div class="starmap-header">
+      <div>
+        <h3 style="font-family:'Orbitron',sans-serif; color:var(--neon-cyan); letter-spacing:1px; margin:0 0 4px 0;">INTERSTELLAR STARMAP // HYPERLANES</h3>
+        <p style="font-size:11px; color:#8fa0c0; margin:0;">Federated Solar System Directory — Warp across the Open Multiverse</p>
+      </div>
+      <button id="starmap-close-btn" style="background:none; border:none; color:#8fa0c0; font-size:24px; cursor:pointer; padding:0 6px;">&times;</button>
+    </div>
+
+    <span class="section-label">CONNECTED SOLAR SYSTEMS</span>
+    <div class="system-grid" id="starmap-system-grid">
+      <!-- Populated dynamically -->
+    </div>
+
+    <span class="section-label">CONNECT CUSTOM SOLAR SYSTEM (FEDERATED URL)</span>
+    <div class="custom-system-box">
+      <input type="text" id="custom-system-url" placeholder="https://creator-solarsystem.fly.dev" class="custom-avatar-input" style="flex:1;" />
+      <button id="custom-system-jump-btn" class="hud-action-btn" style="position:static; border-color:#00f0ff; color:#00f0ff;">ALIGN & JUMP</button>
+    </div>
+
+    <span class="section-label">FEDERATION BEACON (SHARE YOUR SOLAR SYSTEM)</span>
+    <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:12px; margin-top:6px;">
+      <p style="font-size:11px; color:#8fa0c0; margin:0 0 6px 0;">Other creators can point their Jump Gates to this URL with zero permissions:</p>
+      <div class="share-url-row">
+        <input type="text" id="my-system-beacon-url" readonly class="custom-avatar-input" style="flex:1;" />
+        <button id="copy-beacon-btn" class="hud-action-btn" style="position:static; border-color:#ffd700; color:#ffd700;">COPY BEACON</button>
+      </div>
     </div>
   </div>
 

@@ -25,6 +25,26 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", name: "Multiverse Magic Server", uptime: process.uptime() });
 });
 
+// Open Federation Manifest: Allows any creator's solar system to discover and link into this galaxy
+app.get(["/galaxy.json", "/system.json"], (req, res) => {
+  const host = `${req.protocol}://${req.get("host")}`;
+  res.json({
+    systemId: "sol",
+    name: "Sol Prime // Nexus Sector",
+    creator: "Multiverse Magic",
+    description: "Central interstellar spaceport with federated hyperlane jump gates.",
+    url: host,
+    wsUrl: host.replace(/^http/, "ws"),
+    theme: "nexus",
+    version: "1.0.0",
+    hyperlanes: [
+      { name: "Vega Outpost", destination: `${host}/?system=vega`, distanceLy: 14.2 },
+      { name: "Kepler Void", destination: `${host}/?system=kepler`, distanceLy: 48.7 },
+      { name: "Alpha Centauri", destination: `${host}/?system=centauri`, distanceLy: 4.3 },
+    ],
+  });
+});
+
 // Serve static frontend build in production
 if (fs.existsSync(distPath)) {
   console.log(`[Server] Serving production client from ${distPath}`);

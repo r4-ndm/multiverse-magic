@@ -35,14 +35,20 @@ export class Overlay {
     this.morphModal = document.getElementById("morph-modal");
     this.hudMorphBtn = document.getElementById("hud-morph-btn");
     this.hudCameraBtn = document.getElementById("hud-camera-btn");
+    this.hudStarmapBtn = document.getElementById("hud-starmap-btn");
+    this.starmapModal = document.getElementById("starmap-modal");
     this.onCameraToggle = null;
+    this.hyperlaneGate = null;
   }
 
-  init(onEnter, onChatSend, onMorph, onCameraToggle = null) {
+  init(onEnter, onChatSend, onMorph, onCameraToggle = null, hyperlaneGate = null, playerSystem = null, audioSystem = null) {
     this.onEnterCallback = onEnter;
     this.onChatSend = onChatSend;
     this.onMorphCallback = onMorph;
     this.onCameraToggle = onCameraToggle;
+    this.hyperlaneGate = hyperlaneGate;
+    this.playerSystem = playerSystem;
+    this.audioSystem = audioSystem;
 
     // Load default pilot callsign if a real custom name was previously saved
     const savedName = localStorage.getItem("pilot_callsign");
@@ -55,6 +61,9 @@ export class Overlay {
 
     // Initialize in-game morph modal
     this.setupMorphModal();
+
+    // Initialize in-game interstellar starmap modal
+    this.setupStarmapModal();
 
     this.enterBtn.addEventListener("click", async () => {
       if (this.isEntered) return;
@@ -303,6 +312,166 @@ export class Overlay {
   closeMorphModal() {
     if (!this.morphModal) return;
     this.morphModal.style.display = "none";
+    document.getElementById("webgl-canvas")?.requestPointerLock();
+  }
+
+  setupStarmapModal() {
+    if (this.hudStarmapBtn) {
+      this.hudStarmapBtn.addEventListener("click", () => {
+        this.toggleStarmapModal();
+      });
+    }
+
+    const closeBtn = document.getElementById("starmap-close-btn");
+    if (closeBtn) {
+      closeBtn.addEventListener("click", () => {
+        this.closeStarmapModal();
+      });
+    }
+
+    // Custom system jump button
+    const customJumpBtn = document.getElementById("custom-system-jump-btn");
+    const customUrlInput = document.getElementById("custom-system-url");
+    if (customJumpBtn && customUrlInput) {
+      customJumpBtn.addEventListener("click", () => {
+        const rawUrl = customUrlInput.value.trim();
+        if (!rawUrl) return;
+
+        let targetUrl = rawUrl;
+        if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
+          targetUrl = "https://" + targetUrl;
+        }
+
+        if (this.hyperlaneGate) {
+          this.hyperlaneGate.setDestination("FEDERATED SYSTEM", targetUrl, 25.0);
+          this.closeStarmapModal();
+          this.hyperlaneGate.engageJump(this.playerSystem, this.audioSystem, this);
+        }
+      });
+    }
+
+    // Copy my beacon URL button
+    const copyBtn = document.getElementById("copy-beacon-btn");
+    const beaconInput = document.getElementById("my-system-beacon-url");
+    if (copyBtn && beaconInput) {
+      copyBtn.addEventListener("click", () => {
+        beaconInput.select();
+        navigator.clipboard.writeText(beaconInput.value).then(() => {
+          copyBtn.innerText = "COPIED! ✓";
+          setTimeout(() => {
+            copyBtn.innerText = "COPY BEACON";
+          }, 2000);
+        }).catch(() => {
+          document.execCommand("copy");
+          copyBtn.innerText = "COPIED! ✓";
+        });
+      });
+    }
+  }
+
+  toggleStarmapModal() {
+    if (!this.starmapModal) return;
+    const isVisible = this.starmapModal.style.display === "block";
+    if (isVisible) {
+      this.closeStarmapModal();
+    } else {
+      this.openStarmapModal();
+    }
+  }
+
+  openStarmapModal() {
+    if (!this.starmapModal) return;
+    if (document.pointerLockElement) {
+      document.exitPointerLock();
+    }
+
+    // Populate current URL into beacon input
+    const beaconInput = document.getElementById("my-system-beacon-url");
+    if (beaconInput) {
+      beaconInput.value = window.location.origin;
+    }
+
+    // Render system cards
+    const grid = document.getElementById("starmap-system-grid");
+    if (grid) {
+      grid.innerHTML = "";
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const activeSystem = urlParams.get("system") || "sol";
+
+      const systems = [
+        {
+          id: "sol",
+          name: "Sol Prime",
+          tag: "NEXUS HUB",
+          desc: "Central deep space citadel with celestial beacon & fighter docks.",
+          meta: "0.0 LY // HOME SECTOR",
+          url: "/?system=sol",
+          icon: "☀️",
+        },
+        {
+          id: "vega",
+          name: "Vega Outpost",
+          tag: "ICE MINING BELT",
+          desc: "Frosty sapphire star field with crystalline ice asteroid deposits.",
+          meta: "14.2 LY // FEDERATED NODE",
+          url: "/?system=vega",
+          icon: "🪐",
+        },
+        {
+          id: "kepler",
+          name: "Kepler Void",
+          tag: "PULSAR GRAVITY WELL",
+          desc: "Radioactive binary pulsar sector with dense plasma radiation belt.",
+          meta: "48.7 LY // UNCHARTED",
+          url: "/?system=kepler",
+          icon: "☄️",
+        },
+        {
+          id: "centauri",
+          name: "Alpha Centauri",
+          tag: "ORBITAL CITADEL",
+          desc: "Golden binary star system hosting high-speed dogfight arenas.",
+          meta: "4.3 LY // FEDERATED HUB",
+          url: "/?system=centauri",
+          icon: "🛰️",
+        },
+      ];
+
+      systems.forEach((sys) => {
+        const isCurrent = sys.id === activeSystem;
+        const card = document.createElement("div");
+        card.className = `system-card ${isCurrent ? "current" : ""}`;
+        card.innerHTML = `
+          <div class="sys-title">
+            <span>${sys.icon}</span>
+            <span>${sys.name}</span>
+            ${isCurrent ? '<span style="color:var(--neon-green); font-size:10px; margin-left:auto;">[CURRENT]</span>' : ''}
+          </div>
+          <div class="sys-desc">${sys.desc}</div>
+          <div class="sys-meta">${sys.meta}</div>
+        `;
+
+        if (!isCurrent) {
+          card.addEventListener("click", () => {
+            if (this.hyperlaneGate) {
+              this.hyperlaneGate.setDestination(sys.name, sys.url, parseFloat(sys.meta) || 12.0);
+              this.closeStarmapModal();
+              this.hyperlaneGate.engageJump(this.playerSystem, this.audioSystem, this);
+            }
+          });
+        }
+
+        grid.appendChild(card);
+      });
+    }
+
+    this.starmapModal.style.display = "block";
+  }
+
+  closeStarmapModal() {
+    if (!this.starmapModal) return;
+    this.starmapModal.style.display = "none";
     document.getElementById("webgl-canvas")?.requestPointerLock();
   }
 
