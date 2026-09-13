@@ -465,43 +465,108 @@ export class AudioSystem {
   }
 
   /**
-   * Speaks text using browser SpeechSynthesis with 3D proximity volume attenuation
+   * Scifi robotic vocoder synthesizer using Web Audio API.
+   * Guaranteed to produce audible scifi voice comms even if browser TTS is blocked by Brave shields or Linux drivers.
+   */
+  playRoboVoice(text, volume = 0.5) {
+    if (!this.audioContext) return;
+    const words = text.split(" ").slice(0, 10);
+    const now = this.audioContext.currentTime;
+
+    words.forEach((word, idx) => {
+      const startTime = now + idx * 0.14;
+      const duration = 0.11;
+
+      const osc = this.audioContext.createOscillator();
+      const gain = this.audioContext.createGain();
+      const filter = this.audioContext.createBiquadFilter();
+
+      // Formant frequency based on word characters
+      const hash = word.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+      const baseFreq = 220 + (hash % 280);
+
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(baseFreq, startTime);
+      osc.frequency.linearRampToValueAtTime(baseFreq * 1.25, startTime + duration);
+
+      filter.type = "bandpass";
+      filter.frequency.setValueAtTime(baseFreq * 2.2, startTime);
+      filter.Q.value = 5.0;
+
+      gain.gain.setValueAtTime(0.001, startTime);
+      gain.gain.linearRampToValueAtTime(volume * 0.25, startTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.audioContext.destination);
+
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    });
+  }
+
+  /**
+   * Speaks text with 3D spatial proximity volume attenuation.
+   * Uses browser SpeechSynthesis with automatic Web Audio vocoder backup.
    */
   speakSpatial(text, sourcePosition, options = {}) {
-    if (!("speechSynthesis" in window)) return;
-
-    // Calculate distance between local player and agent
-    let volume = 1.0;
+    // 1. Calculate distance-based volume
+    let volume = 0.85;
     if (sourcePosition && this.playerSystem?.position) {
       const dist = this.playerSystem.position.distanceTo(sourcePosition);
-      if (dist > this.PROXIMITY_RADIUS) {
-        // Beyond proximity voice radius
-        return;
-      }
-      // Linear falloff within 50 units
-      volume = Math.max(0.15, Math.min(1.0, 1.0 - (dist / this.PROXIMITY_RADIUS)));
+      // Soft attenuation up to 100 units
+      volume = Math.max(0.12, Math.min(1.0, 1.0 - (dist / 100.0)));
     }
 
-    // Play scifi radio comms beep
+    // 2. Play scifi radio comms chirp
     this.playRadioChirp();
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.volume = volume;
-    utterance.rate = options.rate || 1.05;
-    utterance.pitch = options.pitch || 1.15; // Slightly robotic scifi pitch
+    // 3. Attempt browser SpeechSynthesis
+    let ttsWorked = false;
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      try {
+        window.speechSynthesis.resume();
+        window.speechSynthesis.cancel(); // Clear any stalled queue
 
-    // Choose robotic or standard voice if available
-    const voices = window.speechSynthesis.getVoices();
-    const scifiVoice = voices.find(
-      (v) =>
-        v.name.includes("Google") ||
-        v.name.includes("Natural") ||
-        v.name.includes("Daniel") ||
-        v.lang.startsWith("en")
-    );
-    if (scifiVoice) utterance.voice = scifiVoice;
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.volume = volume;
+        utterance.rate = options.rate || 1.05;
+        utterance.pitch = options.pitch || 1.1;
+        utterance.lang = "en-US";
 
-    window.speechSynthesis.speak(utterance);
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length > 0) {
+          const enVoice = voices.find(v => v.lang.startsWith("en")) || voices[0];
+          if (enVoice) utterance.voice = enVoice;
+        }
+
+        utterance.onstart = () => {
+          ttsWorked = true;
+        };
+
+        utterance.onerror = (e) => {
+          console.warn("[AudioSystem] Speech error, using vocoder:", e);
+          this.playRoboVoice(text, volume);
+        };
+
+        window.speechSynthesis.speak(utterance);
+
+        // Fallback check: if browser doesn't start speaking in 350ms, play vocoder
+        setTimeout(() => {
+          if (!ttsWorked && window.speechSynthesis.speaking === false) {
+            this.playRoboVoice(text, volume);
+          }
+        }, 350);
+
+        return;
+      } catch (err) {
+        console.warn("[AudioSystem] Speech synthesis failed:", err);
+      }
+    }
+
+    // Fallback if SpeechSynthesis is unavailable
+    this.playRoboVoice(text, volume);
   }
 }
 
