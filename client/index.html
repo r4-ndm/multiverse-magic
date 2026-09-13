@@ -449,7 +449,7 @@
 
     .avatar-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
       gap: 10px;
       margin-bottom: 18px;
     }
@@ -679,7 +679,12 @@
     <h3>AVATAR TRANSMUTATION // MORPH</h3>
     <span class="section-label">SELECT FORM</span>
     <div class="avatar-grid" id="morph-avatar-grid">
-      <div class="avatar-card selected" data-type="astronaut">
+      <div class="avatar-card selected" data-type="wizard">
+        <span class="icon">🧙‍♂️</span>
+        <span class="name">Wizard</span>
+        <span class="desc">Thor's Hammer</span>
+      </div>
+      <div class="avatar-card" data-type="astronaut">
         <span class="icon">🧑‍🚀</span>
         <span class="name">Astronaut</span>
         <span class="desc">Humanoid</span>
@@ -703,11 +708,11 @@
 
     <span class="section-label">AURA COLOR</span>
     <div class="color-swatches-row" id="morph-color-swatches">
-      <div class="color-swatch selected" data-color="#00f0ff" style="background:#00f0ff;"></div>
-      <div class="color-swatch" data-color="#ff0055" style="background:#ff0055;"></div>
-      <div class="color-swatch" data-color="#ffd700" style="background:#ffd700;"></div>
-      <div class="color-swatch" data-color="#00ff66" style="background:#00ff66;"></div>
-      <div class="color-swatch" data-color="#9d00ff" style="background:#9d00ff;"></div>
+      <div class="color-swatch selected" data-color="#9d00ff" style="background:#9d00ff;" title="Purple"></div>
+      <div class="color-swatch" data-color="#00f0ff" style="background:#00f0ff;" title="Cyan"></div>
+      <div class="color-swatch" data-color="#ff0055" style="background:#ff0055;" title="Pink"></div>
+      <div class="color-swatch" data-color="#ffd700" style="background:#ffd700;" title="Gold"></div>
+      <div class="color-swatch" data-color="#00ff66" style="background:#00ff66;" title="Green"></div>
     </div>
 
     <span class="section-label">CUSTOM 3D MODEL (.GLB URL - OPTIONAL)</span>
@@ -734,7 +739,12 @@
       <div style="text-align:left; margin-bottom: 20px;">
         <span class="section-label">CHOOSE CHARACTER FORM</span>
         <div class="avatar-grid" id="entry-avatar-grid">
-          <div class="avatar-card selected" data-type="astronaut">
+          <div class="avatar-card selected" data-type="wizard">
+            <span class="icon">🧙‍♂️</span>
+            <span class="name">Wizard</span>
+            <span class="desc">Thor's Hammer</span>
+          </div>
+          <div class="avatar-card" data-type="astronaut">
             <span class="icon">🧑‍🚀</span>
             <span class="name">Astronaut</span>
             <span class="desc">Humanoid</span>
@@ -758,11 +768,11 @@
 
         <span class="section-label">SUIT / AURA COLOR</span>
         <div class="color-swatches-row" id="entry-color-swatches">
-          <div class="color-swatch selected" data-color="#00f0ff" style="background:#00f0ff;"></div>
-          <div class="color-swatch" data-color="#ff0055" style="background:#ff0055;"></div>
-          <div class="color-swatch" data-color="#ffd700" style="background:#ffd700;"></div>
-          <div class="color-swatch" data-color="#00ff66" style="background:#00ff66;"></div>
-          <div class="color-swatch" data-color="#9d00ff" style="background:#9d00ff;"></div>
+          <div class="color-swatch selected" data-color="#9d00ff" style="background:#9d00ff;" title="Purple"></div>
+          <div class="color-swatch" data-color="#00f0ff" style="background:#00f0ff;" title="Cyan"></div>
+          <div class="color-swatch" data-color="#ff0055" style="background:#ff0055;" title="Pink"></div>
+          <div class="color-swatch" data-color="#ffd700" style="background:#ffd700;" title="Gold"></div>
+          <div class="color-swatch" data-color="#00ff66" style="background:#00ff66;" title="Green"></div>
         </div>
 
         <span class="section-label">CUSTOM 3D AVATAR (.GLB URL - OPTIONAL)</span>

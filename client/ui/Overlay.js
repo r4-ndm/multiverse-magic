@@ -26,8 +26,8 @@ export class Overlay {
     this.isEntered = false;
 
     // Character customization state
-    this.selectedCharacterType = "astronaut";
-    this.selectedColor = "#00f0ff";
+    this.selectedCharacterType = "wizard";
+    this.selectedColor = "#9d00ff";
     this.selectedAvatarUrl = "";
 
     this.morphModal = document.getElementById("morph-modal");

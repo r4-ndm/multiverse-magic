@@ -202,8 +202,8 @@ export class SpaceRoom extends Room {
     const player = new Player();
     player.id = client.sessionId;
     player.name = pilotName;
-    player.characterType = options.characterType || "astronaut";
-    player.color = options.color || "#00f0ff";
+    player.characterType = options.characterType || "wizard";
+    player.color = options.color || "#9d00ff";
     player.avatarUrl = options.avatarUrl || "";
     player.x = (Math.random() - 0.5) * 30;
     player.y = (Math.random() - 0.5) * 10;
