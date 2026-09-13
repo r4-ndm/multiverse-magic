@@ -7,6 +7,7 @@ import { VesselCharacter } from "./vessel.js";
 
 import { NinjaCharacter } from "./ninja.js";
 import { FrogCharacter } from "./frog.js";
+import { SquirrelCharacter } from "./squirrel.js";
 
 characterRegistry.register(WizardCharacter);
 characterRegistry.register(AstronautCharacter);
@@ -15,7 +16,8 @@ characterRegistry.register(CelestialCharacter);
 characterRegistry.register(VesselCharacter);
 characterRegistry.register(NinjaCharacter);
 characterRegistry.register(FrogCharacter);
+characterRegistry.register(SquirrelCharacter);
 
 export { characterRegistry };
-export { WizardCharacter, AstronautCharacter, AndroidCharacter, CelestialCharacter, VesselCharacter, NinjaCharacter, FrogCharacter };
+export { WizardCharacter, AstronautCharacter, AndroidCharacter, CelestialCharacter, VesselCharacter, NinjaCharacter, FrogCharacter, SquirrelCharacter };
 

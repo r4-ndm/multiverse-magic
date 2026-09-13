@@ -763,6 +763,10 @@ export class PlayerSystem {
       case "cosmic_frog":
       case "toad":
         return characterRegistry.createMesh("frog", accentColor);
+      case "squirrel":
+      case "galactic_squirrel":
+      case "chipmunk":
+        return characterRegistry.createMesh("squirrel", accentColor);
       case "vessel":
       case "ship":
       default:
