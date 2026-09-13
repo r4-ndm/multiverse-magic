@@ -64,6 +64,9 @@ class OpenSpaceApp {
         }
         this.playerSystem.setLocalCharacter(newType, newColor, newUrl);
         this.networkSystem.sendSetCharacter(newType, newColor, newUrl);
+
+        // Automatically switch to 3rd-person view so the player sees their new avatar form!
+        this.playerSystem.setCameraMode("third");
       },
       () => {
         this.playerSystem?.toggleCameraMode();

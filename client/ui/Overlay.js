@@ -216,11 +216,21 @@ export class Overlay {
         const selectedCard = document.querySelector("#morph-avatar-grid .avatar-card.selected");
         const selectedSwatch = document.querySelector("#morph-color-swatches .color-swatch.selected");
         const urlInput = document.getElementById("morph-avatar-url");
+        let newUrl = urlInput ? urlInput.value.trim() : "";
 
         const newType = selectedCard ? selectedCard.dataset.type : this.selectedCharacterType;
         const newColor = selectedSwatch ? selectedSwatch.dataset.color : this.selectedColor;
         const nameInput = document.getElementById("morph-pilot-name");
-        const newName = nameInput ? nameInput.value.trim() : "";
+        let newName = nameInput ? nameInput.value.trim() : "";
+
+        // Smart name detection: if someone typed their username into the avatar URL field by mistake
+        if (newUrl && !newUrl.startsWith("http://") && !newUrl.startsWith("https://") && !newUrl.endsWith(".glb") && !newUrl.endsWith(".gltf")) {
+          if (!newName) {
+            newName = newUrl;
+            newUrl = "";
+          }
+        }
+
         if (newName) {
           this.currentPilotName = newName;
           localStorage.setItem("pilot_callsign", newName);

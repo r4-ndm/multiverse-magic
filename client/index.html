@@ -587,33 +587,43 @@
       border: 1px solid rgba(255, 255, 255, 0.2);
     }
 
-    /* HUD Action Buttons */
-    .hud-action-btn {
+    /* HUD Action Bar */
+    #hud-action-bar {
       position: absolute;
       top: 18px;
+      left: 370px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      z-index: 25;
+      pointer-events: auto;
+    }
+
+    .hud-action-btn {
       background: var(--dark-bg);
       border: 1px solid var(--neon-cyan);
       color: var(--neon-cyan);
       font-family: 'JetBrains Mono', monospace;
       font-size: 11px;
       font-weight: 700;
-      padding: 8px 14px;
+      padding: 9px 15px;
       border-radius: 6px;
       cursor: pointer;
       pointer-events: auto;
       backdrop-filter: blur(8px);
       box-shadow: 0 0 10px rgba(0, 240, 255, 0.25);
       transition: all 0.2s ease;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
     .hud-action-btn:hover {
       background: rgba(0, 240, 255, 0.2);
       box-shadow: 0 0 16px rgba(0, 240, 255, 0.6);
-    }
-    #hud-morph-btn {
-      left: 280px;
+      transform: translateY(-1px);
     }
     #hud-camera-btn {
-      left: 410px;
       border-color: #ffd700;
       color: #ffd700;
       box-shadow: 0 0 10px rgba(255, 215, 0, 0.25);
@@ -685,8 +695,10 @@
     </div>
 
     <!-- In-Game Action Buttons -->
-    <button id="hud-morph-btn" class="hud-action-btn">🎭 MORPH [H]</button>
-    <button id="hud-camera-btn" class="hud-action-btn">🎯 1ST PERSON [V]</button>
+    <div id="hud-action-bar">
+      <button id="hud-camera-btn" class="hud-action-btn">🎯 1ST PERSON [V]</button>
+      <button id="hud-morph-btn" class="hud-action-btn">🎭 MORPH [H]</button>
+    </div>
   </div>
 
   <!-- In-Game Avatar Morph Modal -->
