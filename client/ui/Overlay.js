@@ -57,17 +57,24 @@ export class Overlay {
       if (this.isEntered) return;
       this.isEntered = true;
 
-      const rawInput = this.pilotNameInput?.value.trim();
+      let rawInput = this.pilotNameInput?.value.trim() || "";
+      const avatarUrlInput = document.getElementById("entry-avatar-url");
+      let rawUrl = avatarUrlInput ? avatarUrlInput.value.trim() : "";
+
+      // Smart detection: if someone typed their username into the avatar URL field by mistake
+      if (rawUrl && !rawUrl.startsWith("http://") && !rawUrl.startsWith("https://") && !rawUrl.endsWith(".glb") && !rawUrl.endsWith(".gltf")) {
+        if (!rawInput) {
+          rawInput = rawUrl;
+          rawUrl = "";
+        }
+      }
+
       const chosenName = rawInput || (savedName && !savedName.startsWith("Pilot-") ? savedName : `Pilot-${Math.floor(1000 + Math.random() * 9000)}`);
       if (rawInput) {
         localStorage.setItem("pilot_callsign", rawInput);
       }
       this.currentPilotName = chosenName;
-
-      const avatarUrlInput = document.getElementById("entry-avatar-url");
-      if (avatarUrlInput && avatarUrlInput.value.trim()) {
-        this.selectedAvatarUrl = avatarUrlInput.value.trim();
-      }
+      this.selectedAvatarUrl = rawUrl;
 
       // Trigger user activation callback (mic request, audio context, colyseus connect)
       if (this.onEnterCallback) {
