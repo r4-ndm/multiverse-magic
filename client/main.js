@@ -55,7 +55,13 @@ class OpenSpaceApp {
           this.networkSystem.room.send("chat", text);
         }
       },
-      (newType, newColor, newUrl) => {
+      (newType, newColor, newUrl, newName) => {
+        if (newName && newName !== this.pilotName) {
+          this.pilotName = newName;
+          this.playerSystem.setLocalName(newName);
+          this.overlay.setPlayerInfo(this.networkSystem.sessionId, this.networkSystem.room?.name, newName);
+          this.networkSystem.sendSetName(newName);
+        }
         this.playerSystem.setLocalCharacter(newType, newColor, newUrl);
         this.networkSystem.sendSetCharacter(newType, newColor, newUrl);
       }
@@ -127,6 +133,22 @@ class OpenSpaceApp {
         this.playerSystem.updateRemoteCharacter(id, data);
         const name = data.name || id.slice(0, 6);
         this.overlay.addLogItem(`✨ Pilot [${name}] transmuted into [${(data.characterType || "form").toUpperCase()}]`);
+      }
+    };
+
+    // Dynamic name change handler
+    this.networkSystem.onNameChanged = (id, newName) => {
+      if (id === this.networkSystem.sessionId) {
+        this.pilotName = newName;
+        this.playerSystem.setLocalName(newName);
+        this.overlay.setPlayerInfo(id, this.networkSystem.room?.name, newName);
+      } else {
+        const remote = this.playerSystem.remotePlayers.get(id);
+        if (remote) {
+          remote.name = newName;
+          this.playerSystem.updateNametagSprite(remote.nametagSprite, newName, remote.health);
+        }
+        this.overlay.addLogItem(`Pilot changed callsign to [${newName}]`);
       }
     };
 

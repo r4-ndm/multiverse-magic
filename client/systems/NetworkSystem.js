@@ -154,4 +154,9 @@ export class NetworkSystem {
     if (!this.room) return;
     this.room.send("set_character", { characterType, color, avatarUrl });
   }
+
+  sendSetName(name) {
+    if (!this.room) return;
+    this.room.send("set_name", name);
+  }
 }

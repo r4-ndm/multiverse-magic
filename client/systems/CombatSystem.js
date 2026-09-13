@@ -1,8 +1,8 @@
 import * as THREE from "three";
 
 /**
- * CombatSystem handles laser & arcane raycasting, hit detection, volumetric
- * 3D beam rendering, muzzle flashes, hit sparks, screen damage effects, and audio triggers.
+ * CombatSystem handles laser raycasting, target detection, laser beam rendering,
+ * hit sparks, muzzle flashes, and screen damage effects.
  */
 export class CombatSystem {
   constructor(scene, camera) {
@@ -14,7 +14,7 @@ export class CombatSystem {
     this.audioSystem = null;
 
     this.lastShootTime = 0;
-    this.shootCooldown = 350; // Snappy 350ms cooldown
+    this.shootCooldown = 400; // 400ms cooldown
 
     // Active visual effects pools
     this.activeBeams = [];
@@ -32,9 +32,9 @@ export class CombatSystem {
     if (this._listenersBound) return;
     this._listenersBound = true;
 
-    // 1. Listen for left-click to shoot
+    // Listen for left-click to shoot
     window.addEventListener("mousedown", (e) => {
-      // Ignore clicks on UI elements (inputs, buttons, modals)
+      // Ignore clicks on UI inputs, buttons, and modals
       const target = e.target;
       if (
         target.tagName === "INPUT" ||
@@ -47,7 +47,7 @@ export class CombatSystem {
 
       // Left click
       if (e.button === 0) {
-        // Auto-request pointer lock if not locked, without blocking the shot
+        // Auto-request pointer lock if not locked
         if (
           this.playerSystem &&
           !this.playerSystem.isPointerLocked &&
@@ -59,7 +59,7 @@ export class CombatSystem {
       }
     });
 
-    // 2. Keyboard trigger: KeyF to fire
+    // Keyboard trigger: KeyF to fire laser
     window.addEventListener("keydown", (e) => {
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
       if (e.code === "KeyF" && !e.repeat) {
@@ -77,9 +77,9 @@ export class CombatSystem {
 
     // 1. Raycast from camera center (crosshair at 0, 0)
     this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
-    this.raycaster.far = 300.0;
+    this.raycaster.far = 280.0;
 
-    // 2. Target detection: gather remote players
+    // Gather candidate meshes from remote players
     const targets = [];
     this.playerSystem.remotePlayers.forEach((remote, sessionId) => {
       remote.mesh.traverse((child) => {
@@ -92,23 +92,29 @@ export class CombatSystem {
 
     const intersects = this.raycaster.intersectObjects(targets, false);
 
+    // Calculate origin: centered forward nose offset aligned with crosshair
+    const shipPos = this.playerSystem.position.clone();
+    const shipQuat = this.playerSystem.quaternion.clone();
+    const noseOffset = new THREE.Vector3(0, 0.4, -2.2).applyQuaternion(shipQuat);
+    const laserOrigin = shipPos.add(noseOffset);
+
     let hitPoint = null;
     let hitTargetId = null;
 
     if (intersects.length > 0) {
-      hitPoint = intersects[0].point;
-      hitTargetId = intersects[0].object.userData.targetSessionId;
+      const hit = intersects[0];
+      hitPoint = hit.point;
+      hitTargetId = hit.object.userData.targetSessionId;
     } else {
-      // Generous proximity hitbox for snappy, rewarding combat feel
+      // Also check bounding sphere for smooth hit registration
       const ray = this.raycaster.ray;
       let closestDist = Infinity;
-
       this.playerSystem.remotePlayers.forEach((remote, sessionId) => {
         const center = remote.mesh.position.clone().add(new THREE.Vector3(0, 1.2, 0));
         const distToRay = ray.distanceToPoint(center);
-        if (distToRay < 2.6) {
+        if (distToRay < 2.5) {
           const distFromCam = this.camera.position.distanceTo(center);
-          if (distFromCam < closestDist && distFromCam < 300) {
+          if (distFromCam < closestDist && distFromCam < 280) {
             closestDist = distFromCam;
             hitTargetId = sessionId;
             hitPoint = center.clone();
@@ -117,51 +123,25 @@ export class CombatSystem {
       });
     }
 
-    // 3. Compute weapon muzzle origin based on active avatar
-    const shipPos = this.playerSystem.position.clone();
-    const shipQuat = this.playerSystem.quaternion.clone();
-
-    let localOffset;
-    if (this.playerSystem.characterType === "wizard") {
-      // Emanate directly from Thor's Hammer (held in right hand)
-      localOffset = new THREE.Vector3(0.75, 0.95, -0.9);
-    } else if (this.playerSystem.characterType === "vessel") {
-      // Starship nose cannons
-      localOffset = new THREE.Vector3(0, 0.2, -2.5);
-    } else {
-      // Humanoid avatar blaster hand
-      localOffset = new THREE.Vector3(0.35, 1.1, -1.0);
-    }
-
-    const muzzleOffset = localOffset.applyQuaternion(shipQuat);
-    const laserOrigin = shipPos.add(muzzleOffset);
-
-    // If no hit, beam travels into deep space
     if (!hitPoint) {
+      // If no hit, laser beam travels out into space along camera ray
       hitPoint = laserOrigin.clone().add(this.raycaster.ray.direction.clone().multiplyScalar(220));
     }
 
-    // Determine beam color (Cyan / Lightning Blue by default)
-    const beamColor = this.playerSystem.characterColor || 0x00f0ff;
+    // Render local laser beam (bright cyan) and muzzle flash
+    this.createLaserBeam(laserOrigin, hitPoint, 0x00f0ff);
+    this.createMuzzleFlash(laserOrigin, 0x00f0ff);
 
-    // 4. Render volumetric 3D energy beam & muzzle flash
-    this.createLaserBeam(laserOrigin, hitPoint, beamColor);
-    this.createMuzzleFlash(laserOrigin, beamColor);
-
-    // If target was hit, trigger hit spark immediately
     if (hitTargetId) {
       this.createHitSpark(hitPoint, 0xff0055);
     }
 
-    // 5. Tactile crosshair recoil animation
-    this.triggerCrosshairRecoil();
-
-    // 6. Play local pew sound
+    // Play classic local pew sound
     if (this.audioSystem) {
       this.audioSystem.playPewSound();
     }
 
-    // 7. Broadcast to server
+    // Broadcast to server
     if (this.networkSystem) {
       this.networkSystem.sendShoot(
         hitTargetId,
@@ -189,7 +169,7 @@ export class CombatSystem {
       destination = origin.clone().add(dir.multiplyScalar(220));
     }
 
-    // Render hostile / peer laser beam (neon magenta/pink)
+    // Render peer laser beam (neon magenta/pink)
     this.createLaserBeam(origin, destination, 0xff0055);
     this.createMuzzleFlash(origin, 0xff0055);
 
@@ -209,7 +189,7 @@ export class CombatSystem {
     const isLocal = data.targetId === this.networkSystem?.sessionId;
 
     if (isLocal) {
-      // Local player sustained damage
+      // Local player sustained damage!
       this.flashDamageVignette();
       if (this.audioSystem) this.audioSystem.playHitSound();
 
@@ -244,67 +224,51 @@ export class CombatSystem {
   }
 
   /**
-   * Creates a volumetric 3D cylinder laser beam with glowing core and point light.
+   * Creates a bright, glowing laser line directly between start and end.
    */
   createLaserBeam(start, end, colorHex = 0x00f0ff) {
-    const distance = start.distanceTo(end);
-    if (distance < 0.1) return;
+    const points = [start, end];
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
 
-    // 1. Outer energy beam cylinder
-    const beamRadius = 0.14;
-    const geometry = new THREE.CylinderGeometry(beamRadius, beamRadius, distance, 8, 1, true);
-    geometry.translate(0, distance / 2, 0);
-    geometry.rotateX(Math.PI / 2);
-
-    const material = new THREE.MeshBasicMaterial({
+    // Outer glow laser line
+    const material = new THREE.LineBasicMaterial({
       color: colorHex,
-      transparent: true,
-      opacity: 0.95,
-      blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide,
-    });
-
-    const beamMesh = new THREE.Mesh(geometry, material);
-    beamMesh.position.copy(start);
-    beamMesh.lookAt(end);
-    this.scene.add(beamMesh);
-
-    // 2. High-intensity white energy core
-    const coreGeo = new THREE.CylinderGeometry(beamRadius * 0.45, beamRadius * 0.45, distance, 6, 1, true);
-    coreGeo.translate(0, distance / 2, 0);
-    coreGeo.rotateX(Math.PI / 2);
-
-    const coreMat = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
+      linewidth: 3,
       transparent: true,
       opacity: 1.0,
       blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide,
     });
-    const coreMesh = new THREE.Mesh(coreGeo, coreMat);
-    beamMesh.add(coreMesh);
 
-    // 3. Dynamic flash light illuminating surrounding space
-    const flashLight = new THREE.PointLight(colorHex, 3.5, 35);
-    flashLight.position.copy(start);
-    this.scene.add(flashLight);
+    const line = new THREE.Line(geometry, material);
+    this.scene.add(line);
+
+    // Inner bright white laser core for intense visibility
+    const coreMat = new THREE.LineBasicMaterial({
+      color: 0xffffff,
+      linewidth: 2,
+      transparent: true,
+      opacity: 1.0,
+      blending: THREE.AdditiveBlending,
+    });
+    const coreLine = new THREE.Line(geometry, coreMat);
+    this.scene.add(coreLine);
 
     this.activeBeams.push({
-      mesh: beamMesh,
-      light: flashLight,
+      line,
+      coreLine,
       material,
       coreMat,
-      life: 0.26, // 260ms lifespan
-      maxLife: 0.26,
+      life: 0.18, // 180ms lifespan
+      maxLife: 0.18,
     });
   }
 
   createMuzzleFlash(position, colorHex) {
-    const flashGeo = new THREE.SphereGeometry(0.65, 10, 10);
+    const flashGeo = new THREE.SphereGeometry(0.55, 8, 8);
     const flashMat = new THREE.MeshBasicMaterial({
       color: colorHex,
       transparent: true,
-      opacity: 0.95,
+      opacity: 0.9,
       blending: THREE.AdditiveBlending,
     });
     const flashMesh = new THREE.Mesh(flashGeo, flashMat);
@@ -314,13 +278,13 @@ export class CombatSystem {
     this.activeFlashes.push({
       mesh: flashMesh,
       material: flashMat,
-      life: 0.12,
-      maxLife: 0.12,
+      life: 0.10,
+      maxLife: 0.10,
     });
   }
 
   createHitSpark(position, colorHex = 0xff0055) {
-    const sparkCount = 16;
+    const sparkCount = 14;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(sparkCount * 3);
     const velocities = [];
@@ -331,9 +295,9 @@ export class CombatSystem {
       positions[i * 3 + 2] = position.z;
 
       const vel = new THREE.Vector3(
-        (Math.random() - 0.5) * 18,
-        (Math.random() - 0.5) * 18,
-        (Math.random() - 0.5) * 18
+        (Math.random() - 0.5) * 15,
+        (Math.random() - 0.5) * 15,
+        (Math.random() - 0.5) * 15
       );
       velocities.push(vel);
     }
@@ -356,20 +320,9 @@ export class CombatSystem {
       material,
       velocities,
       positions,
-      life: 0.35,
-      maxLife: 0.35,
+      life: 0.3,
+      maxLife: 0.3,
     });
-  }
-
-  triggerCrosshairRecoil() {
-    const crosshair = document.getElementById("crosshair");
-    if (!crosshair) return;
-    crosshair.style.transform = "translate(-50%, -50%) scale(1.45)";
-    crosshair.style.filter = "brightness(2) drop-shadow(0 0 10px #00f0ff)";
-    setTimeout(() => {
-      crosshair.style.transform = "translate(-50%, -50%) scale(1)";
-      crosshair.style.filter = "none";
-    }, 110);
   }
 
   flashDamageVignette() {
@@ -385,22 +338,21 @@ export class CombatSystem {
   }
 
   update(delta) {
-    // 1. Update volumetric laser beams & dynamic lights
+    // 1. Update laser beams
     for (let i = this.activeBeams.length - 1; i >= 0; i--) {
       const beam = this.activeBeams[i];
       beam.life -= delta;
       if (beam.life <= 0) {
-        this.scene.remove(beam.mesh);
-        if (beam.light) this.scene.remove(beam.light);
-        beam.mesh.geometry.dispose();
+        this.scene.remove(beam.line);
+        if (beam.coreLine) this.scene.remove(beam.coreLine);
+        beam.line.geometry.dispose();
         beam.material.dispose();
         beam.coreMat?.dispose();
         this.activeBeams.splice(i, 1);
       } else {
-        const progress = beam.life / beam.maxLife;
-        beam.material.opacity = progress * 0.95;
-        if (beam.coreMat) beam.coreMat.opacity = progress;
-        if (beam.light) beam.light.intensity = progress * 3.5;
+        const opacity = beam.life / beam.maxLife;
+        beam.material.opacity = opacity;
+        if (beam.coreMat) beam.coreMat.opacity = opacity;
       }
     }
 
@@ -414,8 +366,7 @@ export class CombatSystem {
         flash.material.dispose();
         this.activeFlashes.splice(i, 1);
       } else {
-        flash.mesh.scale.multiplyScalar(1.18);
-        flash.material.opacity = (flash.life / flash.maxLife) * 0.95;
+        flash.mesh.scale.multiplyScalar(1.15);
       }
     }
 

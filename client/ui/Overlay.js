@@ -197,17 +197,23 @@ export class Overlay {
 
         const newType = selectedCard ? selectedCard.dataset.type : this.selectedCharacterType;
         const newColor = selectedSwatch ? selectedSwatch.dataset.color : this.selectedColor;
-        const newUrl = urlInput ? urlInput.value.trim() : "";
+        const nameInput = document.getElementById("morph-pilot-name");
+        const newName = nameInput ? nameInput.value.trim() : "";
+        if (newName) {
+          this.currentPilotName = newName;
+          localStorage.setItem("pilot_callsign", newName);
+        }
 
         this.selectedCharacterType = newType;
         this.selectedColor = newColor;
         this.selectedAvatarUrl = newUrl;
 
         if (this.onMorphCallback) {
-          this.onMorphCallback(newType, newColor, newUrl);
+          this.onMorphCallback(newType, newColor, newUrl, newName);
         }
 
-        this.addLogItem(`✨ Transmuted form into [${newType.toUpperCase()}]`);
+        const displayName = newName || this.currentPilotName || "Pilot";
+        this.addLogItem(`✨ [${displayName}] transmuted form into [${newType.toUpperCase()}]`);
         this.closeMorphModal();
       });
     }
@@ -235,6 +241,12 @@ export class Overlay {
     if (!this.morphModal) return;
     if (document.pointerLockElement) {
       document.exitPointerLock();
+    }
+
+    // Pre-fill pilot name
+    const nameInput = document.getElementById("morph-pilot-name");
+    if (nameInput) {
+      nameInput.value = this.currentPilotName || localStorage.getItem("pilot_callsign") || "";
     }
 
     // Sync modal selection to current active state

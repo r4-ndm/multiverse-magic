@@ -69,7 +69,7 @@ export class PlayerSystem {
     // Create holographic nametag above local ship
     this.localName = "YOU";
     this.localNametag = this.createNametagSprite(this.localName, 100, true);
-    this.localNametag.position.set(0, 2.5, 0);
+    this.localNametag.position.set(0, 3.4, 0);
     this.mesh.add(this.localNametag);
 
     // Setup input listeners
@@ -119,7 +119,7 @@ export class PlayerSystem {
 
     // Re-attach nametag
     if (this.localNametag) {
-      this.localNametag.position.set(0, 2.5, 0);
+      this.localNametag.position.set(0, 3.4, 0);
       this.mesh.add(this.localNametag);
     }
 
@@ -879,7 +879,7 @@ export class PlayerSystem {
 
       // Create holographic nametag + health billboard above character
       const nametagSprite = this.createNametagSprite(pilotName, data.health || 100, false);
-      nametagSprite.position.set(0, 2.5, 0);
+      nametagSprite.position.set(0, 3.4, 0);
       mesh.add(nametagSprite);
 
       this.scene.add(mesh);
