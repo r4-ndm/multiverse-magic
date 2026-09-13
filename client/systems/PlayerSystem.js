@@ -759,6 +759,10 @@ export class PlayerSystem {
       case "celestial":
       case "cosmic":
         return this.createCelestialMesh(accentColor);
+      case "frog":
+      case "cosmic_frog":
+      case "toad":
+        return characterRegistry.createMesh("frog", accentColor);
       case "vessel":
       case "ship":
       default:

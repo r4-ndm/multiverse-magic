@@ -16,6 +16,7 @@ import * as THREE from "three";
 export class CharacterRegistry {
   constructor() {
     this.characters = new Map();
+    this.aliases = new Map();
   }
 
   register(definition) {
@@ -24,15 +25,25 @@ export class CharacterRegistry {
       return;
     }
     this.characters.set(definition.id, definition);
+    if (Array.isArray(definition.aliases)) {
+      definition.aliases.forEach((alias) => this.aliases.set(alias, definition.id));
+    }
     console.log(`[CharacterRegistry] Registered avatar: [${definition.id}] (${definition.name || definition.id})`);
   }
 
+  registerAlias(alias, targetId) {
+    this.aliases.set(alias, targetId);
+  }
+
   get(id) {
-    return this.characters.get(id);
+    if (this.characters.has(id)) return this.characters.get(id);
+    const resolved = this.aliases.get(id);
+    if (resolved && this.characters.has(resolved)) return this.characters.get(resolved);
+    return undefined;
   }
 
   has(id) {
-    return this.characters.has(id);
+    return this.characters.has(id) || this.aliases.has(id);
   }
 
   getAll() {
