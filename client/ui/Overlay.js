@@ -34,12 +34,15 @@ export class Overlay {
 
     this.morphModal = document.getElementById("morph-modal");
     this.hudMorphBtn = document.getElementById("hud-morph-btn");
+    this.hudCameraBtn = document.getElementById("hud-camera-btn");
+    this.onCameraToggle = null;
   }
 
-  init(onEnter, onChatSend, onMorph) {
+  init(onEnter, onChatSend, onMorph, onCameraToggle = null) {
     this.onEnterCallback = onEnter;
     this.onChatSend = onChatSend;
     this.onMorphCallback = onMorph;
+    this.onCameraToggle = onCameraToggle;
 
     // Load default pilot callsign if a real custom name was previously saved
     const savedName = localStorage.getItem("pilot_callsign");
@@ -186,6 +189,14 @@ export class Overlay {
     if (this.hudMorphBtn) {
       this.hudMorphBtn.addEventListener("click", () => {
         this.toggleMorphModal();
+      });
+    }
+
+    if (this.hudCameraBtn) {
+      this.hudCameraBtn.addEventListener("click", () => {
+        if (this.onCameraToggle) {
+          this.onCameraToggle();
+        }
       });
     }
 

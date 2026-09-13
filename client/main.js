@@ -64,6 +64,9 @@ class OpenSpaceApp {
         }
         this.playerSystem.setLocalCharacter(newType, newColor, newUrl);
         this.networkSystem.sendSetCharacter(newType, newColor, newUrl);
+      },
+      () => {
+        this.playerSystem?.toggleCameraMode();
       }
     );
 

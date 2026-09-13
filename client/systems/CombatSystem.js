@@ -92,11 +92,19 @@ export class CombatSystem {
 
     const intersects = this.raycaster.intersectObjects(targets, false);
 
-    // Calculate weapon origin: Thor's Hammer / weapon arm offset so laser visibly emerges from weapon
-    const shipPos = this.playerSystem.position.clone();
-    const shipQuat = this.playerSystem.quaternion.clone();
-    const weaponOffset = new THREE.Vector3(0.65, 0.95, -1.0).applyQuaternion(shipQuat);
-    const laserOrigin = shipPos.clone().add(weaponOffset);
+    // Calculate weapon origin: FPS viewport blaster or 3rd-person Thor's Hammer
+    let laserOrigin;
+    if (this.playerSystem?.cameraMode === "fps") {
+      // In First-Person Mode, laser fires from the lower-right weapon hand in front of the camera
+      const fpsWeaponOffset = new THREE.Vector3(0.35, -0.22, -0.55).applyQuaternion(this.camera.quaternion);
+      laserOrigin = this.camera.position.clone().add(fpsWeaponOffset);
+    } else {
+      // In Third-Person Mode, laser fires from Thor's Hammer / right arm
+      const shipPos = this.playerSystem.position.clone();
+      const shipQuat = this.playerSystem.quaternion.clone();
+      const weaponOffset = new THREE.Vector3(0.65, 0.95, -1.0).applyQuaternion(shipQuat);
+      laserOrigin = shipPos.clone().add(weaponOffset);
+    }
 
     let hitPoint = null;
     let hitTargetId = null;

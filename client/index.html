@@ -587,11 +587,10 @@
       border: 1px solid rgba(255, 255, 255, 0.2);
     }
 
-    /* HUD Morph Button */
-    #hud-morph-btn {
+    /* HUD Action Buttons */
+    .hud-action-btn {
       position: absolute;
       top: 18px;
-      left: 280px;
       background: var(--dark-bg);
       border: 1px solid var(--neon-cyan);
       color: var(--neon-cyan);
@@ -606,9 +605,22 @@
       box-shadow: 0 0 10px rgba(0, 240, 255, 0.25);
       transition: all 0.2s ease;
     }
-    #hud-morph-btn:hover {
+    .hud-action-btn:hover {
       background: rgba(0, 240, 255, 0.2);
       box-shadow: 0 0 16px rgba(0, 240, 255, 0.6);
+    }
+    #hud-morph-btn {
+      left: 280px;
+    }
+    #hud-camera-btn {
+      left: 410px;
+      border-color: #ffd700;
+      color: #ffd700;
+      box-shadow: 0 0 10px rgba(255, 215, 0, 0.25);
+    }
+    #hud-camera-btn:hover {
+      background: rgba(255, 215, 0, 0.2);
+      box-shadow: 0 0 16px rgba(255, 215, 0, 0.6);
     }
   </style>
 </head>
@@ -668,12 +680,13 @@
       </div>
       <div class="keybind-hint">
         WASD: Fly & Strafe | Space/C: Ascend/Descend<br/>
-        Left Click / F: Cast Spell & Shoot | M: Mic | Tab: Lock/Unlock
+        Left Click / F: Shoot | V: 1st/3rd Person | Scroll: Zoom | Tab: Cursor
       </div>
     </div>
 
-    <!-- In-Game Morph Button -->
-    <button id="hud-morph-btn">🎭 MORPH [H]</button>
+    <!-- In-Game Action Buttons -->
+    <button id="hud-morph-btn" class="hud-action-btn">🎭 MORPH [H]</button>
+    <button id="hud-camera-btn" class="hud-action-btn">🎯 1ST PERSON [V]</button>
   </div>
 
   <!-- In-Game Avatar Morph Modal -->

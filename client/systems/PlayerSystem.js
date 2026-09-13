@@ -37,9 +37,16 @@ export class PlayerSystem {
       boost: false,
     };
 
-    // Third-person over-the-shoulder camera offset
-    // Offsets camera to the right so the avatar (and wizard hat) is framed on the left,
-    // providing a clear, unoccluded view of the crosshair, Thor's Hammer, and laser fire.
+    // Camera modes: 'fps' (First-Person Shooter) or 'third' (Third-Person Over-the-Shoulder)
+    // Default to First-Person Shooter mode for completely unobstructed view and clean laser combat
+    this.cameraMode = "fps";
+    try {
+      const savedMode = localStorage.getItem("camera_mode");
+      if (savedMode === "fps" || savedMode === "third") {
+        this.cameraMode = savedMode;
+      }
+    } catch (_) {}
+
     this.cameraDistance = 7.5;
     this.cameraOffset = new THREE.Vector3(1.5, 2.5, 7.5);
     this.cameraLookOffset = new THREE.Vector3(0.35, 1.3, -16.0);
@@ -75,8 +82,44 @@ export class PlayerSystem {
     this.localNametag.position.set(0, 3.4, 0);
     this.mesh.add(this.localNametag);
 
+    // Apply initial camera mode (hides mesh & nametag locally in FPS mode)
+    this.setCameraMode(this.cameraMode);
+
     // Setup input listeners
     this.setupInputs();
+  }
+
+  setCameraMode(mode) {
+    this.cameraMode = mode === "third" ? "third" : "fps";
+    try {
+      localStorage.setItem("camera_mode", this.cameraMode);
+    } catch (_) {}
+
+    const isThird = this.cameraMode === "third";
+    if (this.mesh) {
+      this.mesh.visible = isThird;
+    }
+    if (this.localNametag) {
+      this.localNametag.visible = isThird;
+    }
+
+    // Update HUD button text if present
+    const btn = document.getElementById("hud-camera-btn");
+    if (btn) {
+      btn.innerText = isThird ? "📷 3RD PERSON [V]" : "🎯 1ST PERSON [V]";
+      btn.title = isThird ? "Switch to First-Person Mode (V)" : "Switch to Third-Person View (V)";
+    }
+
+    // If switching to third person, snap camera immediately
+    if (isThird) {
+      const targetCamOffset = this.cameraOffset.clone().applyQuaternion(this.quaternion);
+      this.camera.position.copy(this.position.clone().add(targetCamOffset));
+    }
+    return this.cameraMode;
+  }
+
+  toggleCameraMode() {
+    return this.setCameraMode(this.cameraMode === "fps" ? "third" : "fps");
   }
 
   setLocalCharacter(type = "astronaut", color = "#00f0ff", avatarUrl = "") {
@@ -119,10 +162,12 @@ export class PlayerSystem {
     this.mesh = newMesh;
     this.mesh.position.copy(pos);
     this.mesh.quaternion.copy(quat);
+    this.mesh.visible = this.cameraMode === "third";
 
     // Re-attach nametag
     if (this.localNametag) {
       this.localNametag.position.set(0, 3.4, 0);
+      this.localNametag.visible = this.cameraMode === "third";
       this.mesh.add(this.localNametag);
     }
 
@@ -791,12 +836,35 @@ export class PlayerSystem {
       this.quaternion.setFromEuler(this.euler);
     });
 
-    // Mouse wheel zoom to adjust camera distance dynamically
+    // KeyV toggles between First-Person (FPS) and Third-Person (Over-the-shoulder)
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "KeyV" && !e.repeat) {
+        if (document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
+          this.toggleCameraMode();
+        }
+      }
+    });
+
+    // Mouse wheel zoom to adjust camera distance dynamically & blend into FPS
     window.addEventListener(
       "wheel",
       (e) => {
         if (!this.isPointerLocked) return;
-        this.cameraDistance = Math.max(4.2, Math.min(11.5, this.cameraDistance + (e.deltaY > 0 ? 0.6 : -0.6)));
+        if (this.cameraMode === "fps") {
+          // If in FPS mode and zooming out, seamlessly enter 3rd person mode
+          if (e.deltaY > 0) {
+            this.setCameraMode("third");
+          }
+          return;
+        }
+
+        // If in 3rd person and zooming all the way in, seamlessly enter FPS mode
+        if (e.deltaY < 0 && this.cameraDistance <= 4.6) {
+          this.setCameraMode("fps");
+          return;
+        }
+
+        this.cameraDistance = Math.max(4.5, Math.min(11.5, this.cameraDistance + (e.deltaY > 0 ? 0.6 : -0.6)));
         const scale = this.cameraDistance / 7.5;
         this.cameraOffset.set(1.5 * scale, 2.5 * scale, this.cameraDistance);
       },
@@ -843,7 +911,7 @@ export class PlayerSystem {
     this.mesh.position.copy(this.position);
     this.mesh.quaternion.copy(this.quaternion);
 
-    // Smoothly update third-person camera
+    // Smoothly update third-person or first-person camera
     this.updateCamera(delta);
 
     // Update remote players interpolation
@@ -851,19 +919,32 @@ export class PlayerSystem {
   }
 
   updateCamera(delta) {
-    // Ideal over-the-shoulder camera position behind and to the right of avatar
-    const targetCamOffset = this.cameraOffset.clone().applyQuaternion(this.quaternion);
-    const targetCamPos = this.position.clone().add(targetCamOffset);
+    if (this.cameraMode === "fps") {
+      // First-Person Shooter Mode: camera placed at eye level with 0 obstruction
+      const eyeOffset = new THREE.Vector3(0, 1.45, 0).applyQuaternion(this.quaternion);
+      const eyePos = this.position.clone().add(eyeOffset);
+      this.camera.position.copy(eyePos);
 
-    // Smooth, frame-rate independent camera chase
-    const lerpFactor = 1.0 - Math.exp(-14.0 * delta);
-    this.camera.position.lerp(targetCamPos, lerpFactor);
+      // Camera looks directly forward along orientation
+      const lookTarget = eyePos.clone().add(
+        new THREE.Vector3(0, 0, -20.0).applyQuaternion(this.quaternion)
+      );
+      this.camera.lookAt(lookTarget);
+    } else {
+      // Third-Person Over-the-Shoulder Mode
+      const targetCamOffset = this.cameraOffset.clone().applyQuaternion(this.quaternion);
+      const targetCamPos = this.position.clone().add(targetCamOffset);
 
-    // Camera look-at target slightly in front of the avatar
-    const lookTarget = this.position.clone().add(
-      this.cameraLookOffset.clone().applyQuaternion(this.quaternion)
-    );
-    this.camera.lookAt(lookTarget);
+      // Smooth, frame-rate independent camera chase
+      const lerpFactor = 1.0 - Math.exp(-14.0 * delta);
+      this.camera.position.lerp(targetCamPos, lerpFactor);
+
+      // Camera look-at target slightly in front of the avatar
+      const lookTarget = this.position.clone().add(
+        this.cameraLookOffset.clone().applyQuaternion(this.quaternion)
+      );
+      this.camera.lookAt(lookTarget);
+    }
   }
 
   parseColor(color, defaultColor = 0x00f0ff) {
