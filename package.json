@@ -9,6 +9,7 @@
     "server": "node server/index.js",
     "client": "vite client --port 3000 --host",
     "dev": "concurrently -n \"server,client\" -c \"cyan,magenta\" \"node server/index.js\" \"vite client --port 3000 --host\"",
+    "build": "vite build",
     "join": "bash scripts/join.sh",
     "bot": "node scripts/bot.js",
     "create-character": "node scripts/create-character.js"

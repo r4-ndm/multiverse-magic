@@ -752,10 +752,25 @@ export class PlayerSystem {
       }
     });
 
+    // Tab key toggles pointer lock
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Tab") {
+        e.preventDefault();
+        if (document.pointerLockElement === this.domElement) {
+          document.exitPointerLock();
+        } else {
+          this.domElement.requestPointerLock();
+        }
+      }
+    });
+
     document.addEventListener("pointerlockchange", () => {
       this.isPointerLocked = document.pointerLockElement === this.domElement;
       const crosshair = document.getElementById("crosshair");
-      if (crosshair) crosshair.style.display = this.isPointerLocked ? "block" : "none";
+      if (crosshair) {
+        crosshair.style.display = "block";
+        crosshair.style.opacity = this.isPointerLocked ? "1.0" : "0.5";
+      }
     });
 
     document.addEventListener("mousemove", (e) => {

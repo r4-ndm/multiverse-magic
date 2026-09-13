@@ -73,6 +73,10 @@ export class Overlay {
       // Hide entry screen and show HUD
       this.entryOverlay.style.display = "none";
       this.hud.style.display = "block";
+      if (this.crosshair) this.crosshair.style.display = "block";
+
+      // Request pointer lock right from the entry click gesture
+      document.getElementById("webgl-canvas")?.requestPointerLock();
     });
 
     // Chat enter key toggle & H key morph toggle

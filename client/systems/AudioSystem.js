@@ -313,23 +313,46 @@ export class AudioSystem {
 
   playPewSound() {
     if (!this.audioContext) return;
+    if (this.audioContext.state === "suspended") {
+      this.audioContext.resume().catch(() => {});
+    }
     const now = this.audioContext.currentTime;
 
+    // 1. Primary laser / lightning sweep
     const osc = this.audioContext.createOscillator();
     const gain = this.audioContext.createGain();
 
     osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(880, now);
-    osc.frequency.exponentialRampToValueAtTime(110, now + 0.16);
+    osc.frequency.setValueAtTime(1050, now);
+    osc.frequency.exponentialRampToValueAtTime(110, now + 0.18);
 
-    gain.gain.setValueAtTime(0.35, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+    gain.gain.setValueAtTime(0.4, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
 
     osc.connect(gain);
     gain.connect(this.audioContext.destination);
 
     osc.start(now);
-    osc.stop(now + 0.18);
+    osc.stop(now + 0.20);
+
+    // 2. High-frequency crackle/snap for lightning arc impact
+    try {
+      const snapLen = Math.floor(this.audioContext.sampleRate * 0.04);
+      const snapBuf = this.audioContext.createBuffer(1, snapLen, this.audioContext.sampleRate);
+      const data = snapBuf.getChannelData(0);
+      for (let i = 0; i < snapLen; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (snapLen * 0.25));
+      }
+      const noise = this.audioContext.createBufferSource();
+      noise.buffer = snapBuf;
+      const noiseGain = this.audioContext.createGain();
+      noiseGain.gain.setValueAtTime(0.3, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+      noise.connect(noiseGain);
+      noiseGain.connect(this.audioContext.destination);
+      noise.start(now);
+      noise.stop(now + 0.05);
+    } catch (_) {}
   }
 
   playHitSound() {
