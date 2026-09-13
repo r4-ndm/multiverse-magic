@@ -4,7 +4,7 @@ import { Client } from "colyseus.js";
  * Headless AI Pilot Bot for Multiverse Magic
  * Allows AI agents, automated sentries, and companion drones to patrol the 3D universe.
  */
-const wsUrl = process.env.WS_URL || "ws://localhost:2567";
+const wsUrl = process.env.WS_URL || "ws://127.0.0.1:2567";
 const roomName = process.env.ROOM || "space";
 const botName = process.env.BOT_NAME || "AI-Sentry";
 
