@@ -68,6 +68,11 @@ export class NetworkSystem {
       });
     });
 
+    // Also process any players already loaded in initial state snapshot
+    this.room.state.players.forEach((player, key) => {
+      if (this.onPlayerAdd) this.onPlayerAdd(key, player);
+    });
+
     this.room.state.players.onRemove((player, key) => {
       console.log(`[NetworkSystem] Player removed: ${key}`);
       if (this.onPlayerRemove) this.onPlayerRemove(key);

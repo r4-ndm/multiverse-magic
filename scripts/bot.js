@@ -68,8 +68,9 @@ async function startBot() {
     // 3. React to pilot joining
     room.onMessage("player_joined", (data) => {
       console.log(`👀 [${botName}] Detected pilot joining: ${data.id.slice(0, 6)}`);
+      const playerName = data.name || data.id.slice(0, 6);
       setTimeout(() => {
-        room.send("chat", `Welcome to sector space, Pilot [${data.id.slice(0, 6)}].`);
+        room.send("chat", `Welcome to sector space, Pilot [${playerName}].`);
       }, 1500);
     });
 

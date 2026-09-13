@@ -87,6 +87,12 @@ class OpenSpaceApp {
 
     // 2. Connect to Colyseus Server
     try {
+      // Initialize Combat System with network and audio
+      this.combatSystem.init(this.networkSystem, this.playerSystem, this.audioSystem);
+
+      // Wire up network event handlers BEFORE connecting so onPlayerAdd catches local player
+      this.setupNetworkHooks();
+
       const room = await this.networkSystem.connect(null, {
         name: this.pilotName,
         characterType,
@@ -95,12 +101,6 @@ class OpenSpaceApp {
       });
       this.overlay.setPlayerInfo(room.sessionId, room.name, this.pilotName);
       this.overlay.addLogItem(`🌌 Pilot [${this.pilotName}] connected to Sector [${room.id}] as [${characterType.toUpperCase()}]`);
-
-      // Initialize Combat System with network and audio
-      this.combatSystem.init(this.networkSystem, this.playerSystem, this.audioSystem);
-
-      // Wire up network event handlers
-      this.setupNetworkHooks();
 
       this.isEntered = true;
     } catch (err) {

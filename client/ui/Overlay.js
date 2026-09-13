@@ -41,9 +41,9 @@ export class Overlay {
     this.onChatSend = onChatSend;
     this.onMorphCallback = onMorph;
 
-    // Load or generate default pilot callsign
-    const savedName = localStorage.getItem("pilot_callsign") || `Pilot-${Math.floor(1000 + Math.random() * 9000)}`;
-    if (this.pilotNameInput) {
+    // Load default pilot callsign if a real custom name was previously saved
+    const savedName = localStorage.getItem("pilot_callsign");
+    if (this.pilotNameInput && savedName && !savedName.startsWith("Pilot-")) {
       this.pilotNameInput.value = savedName;
     }
 
@@ -57,8 +57,12 @@ export class Overlay {
       if (this.isEntered) return;
       this.isEntered = true;
 
-      const chosenName = this.pilotNameInput?.value.trim() || savedName;
-      localStorage.setItem("pilot_callsign", chosenName);
+      const rawInput = this.pilotNameInput?.value.trim();
+      const chosenName = rawInput || (savedName && !savedName.startsWith("Pilot-") ? savedName : `Pilot-${Math.floor(1000 + Math.random() * 9000)}`);
+      if (rawInput) {
+        localStorage.setItem("pilot_callsign", rawInput);
+      }
+      this.currentPilotName = chosenName;
 
       const avatarUrlInput = document.getElementById("entry-avatar-url");
       if (avatarUrlInput && avatarUrlInput.value.trim()) {
@@ -275,8 +279,9 @@ export class Overlay {
   }
 
   setPlayerInfo(id, roomName = "SPACE", pilotName = null) {
+    const displayName = pilotName || this.currentPilotName || id.slice(0, 8);
     if (this.playerIdEl) {
-      this.playerIdEl.innerText = pilotName ? `${pilotName} [${id.slice(0, 4)}]` : id.slice(0, 8);
+      this.playerIdEl.innerText = displayName;
     }
     const roomEl = document.getElementById("hud-room-id");
     if (roomEl) roomEl.innerText = roomName.toUpperCase();
