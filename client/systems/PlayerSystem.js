@@ -58,21 +58,71 @@ export class PlayerSystem {
   init(domElement) {
     this.domElement = domElement;
 
-    // Create local player avatar
-    this.mesh = this.createSpaceshipMesh(0x00f0ff);
+    this.characterType = "astronaut";
+    this.characterColor = 0x00f0ff;
+
+    // Create local player avatar (Humanoid Astronaut by default)
+    this.mesh = this.createCharacterMesh(this.characterType, this.characterColor);
     this.scene.add(this.mesh);
 
     // Create holographic nametag above local ship
     this.localName = "YOU";
     this.localNametag = this.createNametagSprite(this.localName, 100, true);
-    this.localNametag.position.set(0, 2.3, 0);
+    this.localNametag.position.set(0, 2.5, 0);
     this.mesh.add(this.localNametag);
 
     // Setup input listeners
     this.setupInputs();
+  }
 
-    // Try loading .glb model asynchronously
-    this.loadGlbModel();
+  setLocalCharacter(type = "astronaut", color = "#00f0ff", avatarUrl = "") {
+    this.characterType = type;
+    const colorHex = typeof color === "number" ? color : parseInt(color.replace("#", "0x"), 16);
+    this.characterColor = colorHex;
+
+    if (avatarUrl && avatarUrl.trim()) {
+      this.gltfLoader.load(
+        avatarUrl.trim(),
+        (gltf) => {
+          const model = gltf.scene;
+          model.scale.set(1.5, 1.5, 1.5);
+          this.swapMesh(model);
+        },
+        undefined,
+        (err) => {
+          console.warn("[PlayerSystem] Failed loading custom avatar, fallback to preset:", err);
+          const newMesh = this.createCharacterMesh(type, colorHex);
+          this.swapMesh(newMesh);
+        }
+      );
+    } else {
+      const newMesh = this.createCharacterMesh(type, colorHex);
+      this.swapMesh(newMesh);
+    }
+  }
+
+  swapMesh(newMesh) {
+    if (!this.mesh) return;
+    const pos = this.mesh.position.clone();
+    const quat = this.mesh.quaternion.clone();
+
+    // Detach nametag
+    if (this.localNametag) {
+      this.mesh.remove(this.localNametag);
+    }
+
+    this.scene.remove(this.mesh);
+    this.mesh = newMesh;
+    this.mesh.position.copy(pos);
+    this.mesh.quaternion.copy(quat);
+
+    // Re-attach nametag
+    if (this.localNametag) {
+      this.localNametag.position.set(0, 2.5, 0);
+      this.mesh.add(this.localNametag);
+    }
+
+    this.scene.add(this.mesh);
   }
 
   setLocalName(name) {
@@ -90,33 +140,6 @@ export class PlayerSystem {
     }
   }
 
-  loadGlbModel() {
-    this.gltfLoader.load(
-      "/assets/models/spaceship.glb",
-      (gltf) => {
-        const model = gltf.scene;
-        model.scale.set(0.8, 0.8, 0.8);
-        this.shipModelTemplate = model;
-
-        // Replace local placeholder mesh
-        if (this.mesh) {
-          const pos = this.mesh.position.clone();
-          const quat = this.mesh.quaternion.clone();
-          this.scene.remove(this.mesh);
-
-          this.mesh = model.clone();
-          this.mesh.position.copy(pos);
-          this.mesh.quaternion.copy(quat);
-          this.scene.add(this.mesh);
-        }
-      },
-      undefined,
-      (err) => {
-        // Fallback procedural mesh is already active and works beautifully
-        console.log("[PlayerSystem] Using procedural spaceship mesh (standard fallback)");
-      }
-    );
-  }
 
   /**
    * Generates a sleek, scifi interceptor spacecraft mesh.
@@ -201,6 +224,266 @@ export class PlayerSystem {
 
     shipGroup.castShadow = true;
     return shipGroup;
+  }
+
+  /**
+   * Generates a 3D Humanoid Astronaut / Space Explorer.
+   */
+  createAstronautMesh(accentColor = 0x00f0ff) {
+    const group = new THREE.Group();
+
+    // 1. Torso Space Suit
+    const suitMat = new THREE.MeshStandardMaterial({
+      color: 0xeeeeee,
+      roughness: 0.4,
+      metalness: 0.1,
+    });
+    const torsoGeo = new THREE.CylinderGeometry(0.55, 0.45, 1.3, 10);
+    const torso = new THREE.Mesh(torsoGeo, suitMat);
+    torso.position.y = 0.65;
+    group.add(torso);
+
+    // Chest control unit
+    const chestGeo = new THREE.BoxGeometry(0.4, 0.45, 0.2);
+    const chestMat = new THREE.MeshStandardMaterial({
+      color: 0x222630,
+      metalness: 0.6,
+      roughness: 0.2,
+    });
+    const chest = new THREE.Mesh(chestGeo, chestMat);
+    chest.position.set(0, 0.75, 0.35);
+    group.add(chest);
+
+    // Glowing chest LED
+    const ledGeo = new THREE.BoxGeometry(0.12, 0.12, 0.05);
+    const ledMat = new THREE.MeshBasicMaterial({ color: accentColor });
+    const led = new THREE.Mesh(ledGeo, ledMat);
+    led.position.set(0, 0.8, 0.46);
+    group.add(led);
+
+    // 2. Helmet & Visor
+    const helmetGeo = new THREE.SphereGeometry(0.42, 16, 16);
+    const helmet = new THREE.Mesh(helmetGeo, suitMat);
+    helmet.position.y = 1.6;
+    group.add(helmet);
+
+    // Reflective Gold/Neon Visor
+    const visorGeo = new THREE.SphereGeometry(0.34, 16, 16, 0, Math.PI, 0, Math.PI / 1.5);
+    const visorMat = new THREE.MeshPhysicalMaterial({
+      color: accentColor,
+      emissive: accentColor,
+      emissiveIntensity: 0.3,
+      metalness: 0.9,
+      roughness: 0.1,
+      clearcoat: 1.0,
+    });
+    const visor = new THREE.Mesh(visorGeo, visorMat);
+    visor.rotation.y = -Math.PI / 2;
+    visor.rotation.x = -Math.PI / 6;
+    visor.position.set(0, 1.6, 0.14);
+    group.add(visor);
+
+    // 3. Life-Support Jetpack (Backpack)
+    const packGeo = new THREE.BoxGeometry(0.8, 0.9, 0.35);
+    const packMat = new THREE.MeshStandardMaterial({
+      color: 0x333b4d,
+      roughness: 0.3,
+      metalness: 0.7,
+    });
+    const pack = new THREE.Mesh(packGeo, packMat);
+    pack.position.set(0, 0.75, -0.36);
+    group.add(pack);
+
+    // Dual mini rocket thruster nozzles
+    [-0.25, 0.25].forEach((xOffset) => {
+      const jetGeo = new THREE.CylinderGeometry(0.1, 0.16, 0.3, 8);
+      const jetMat = new THREE.MeshBasicMaterial({ color: accentColor });
+      const jet = new THREE.Mesh(jetGeo, jetMat);
+      jet.position.set(xOffset, 0.25, -0.38);
+      group.add(jet);
+
+      const jetLight = new THREE.PointLight(accentColor, 1.5, 8);
+      jetLight.position.set(xOffset, 0.15, -0.45);
+      group.add(jetLight);
+    });
+
+    // 4. Arms
+    [-0.75, 0.75].forEach((xOffset) => {
+      const armGeo = new THREE.CapsuleGeometry(0.16, 0.7, 8, 8);
+      const arm = new THREE.Mesh(armGeo, suitMat);
+      arm.position.set(xOffset, 0.6, 0.05);
+      arm.rotation.z = xOffset > 0 ? -0.2 : 0.2;
+      group.add(arm);
+    });
+
+    // 5. Legs & Space Boots
+    [-0.32, 0.32].forEach((xOffset) => {
+      const legGeo = new THREE.CapsuleGeometry(0.18, 0.8, 8, 8);
+      const leg = new THREE.Mesh(legGeo, suitMat);
+      leg.position.set(xOffset, -0.3, 0);
+      group.add(leg);
+
+      const bootGeo = new THREE.BoxGeometry(0.26, 0.2, 0.38);
+      const boot = new THREE.Mesh(bootGeo, chestMat);
+      boot.position.set(xOffset, -0.8, 0.06);
+      group.add(boot);
+    });
+
+    // Hitbox for combat raycasting
+    const hitBoxGeo = new THREE.BoxGeometry(2.0, 2.8, 1.8);
+    const hitBoxMat = new THREE.MeshBasicMaterial({ visible: false });
+    const hitBox = new THREE.Mesh(hitBoxGeo, hitBoxMat);
+    hitBox.name = "hitbox";
+    group.add(hitBox);
+
+    group.scale.set(1.4, 1.4, 1.4);
+    return group;
+  }
+
+  /**
+   * Generates a Cyber Mecha / Android Humanoid.
+   */
+  createAndroidMesh(accentColor = 0x9d00ff) {
+    const group = new THREE.Group();
+
+    const metalMat = new THREE.MeshStandardMaterial({
+      color: 0x1a1e29,
+      roughness: 0.25,
+      metalness: 0.9,
+    });
+    const glowMat = new THREE.MeshBasicMaterial({ color: accentColor });
+
+    // Angular Torso
+    const torsoGeo = new THREE.BoxGeometry(0.9, 1.3, 0.6);
+    const torso = new THREE.Mesh(torsoGeo, metalMat);
+    torso.position.y = 0.65;
+    group.add(torso);
+
+    // Glowing Arc Reactor Core
+    const coreGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.1, 16);
+    coreGeo.rotateX(Math.PI / 2);
+    const core = new THREE.Mesh(coreGeo, glowMat);
+    core.position.set(0, 0.8, 0.32);
+    group.add(core);
+
+    // Android Head with cyclops visor
+    const headGeo = new THREE.BoxGeometry(0.5, 0.55, 0.55);
+    const head = new THREE.Mesh(headGeo, metalMat);
+    head.position.y = 1.6;
+    group.add(head);
+
+    const eyeGeo = new THREE.BoxGeometry(0.38, 0.08, 0.1);
+    const eye = new THREE.Mesh(eyeGeo, glowMat);
+    eye.position.set(0, 1.62, 0.28);
+    group.add(eye);
+
+    // Shoulder Pauldrons & Arms
+    [-0.75, 0.75].forEach((x) => {
+      const pauldronGeo = new THREE.ConeGeometry(0.32, 0.5, 4);
+      const pauldron = new THREE.Mesh(pauldronGeo, metalMat);
+      pauldron.position.set(x, 1.15, 0);
+      pauldron.rotation.z = x > 0 ? -Math.PI / 2.5 : Math.PI / 2.5;
+      group.add(pauldron);
+
+      const armGeo = new THREE.BoxGeometry(0.24, 0.9, 0.24);
+      const arm = new THREE.Mesh(armGeo, metalMat);
+      arm.position.set(x, 0.5, 0);
+      group.add(arm);
+    });
+
+    // Legs
+    [-0.32, 0.32].forEach((x) => {
+      const legGeo = new THREE.BoxGeometry(0.28, 1.1, 0.28);
+      const leg = new THREE.Mesh(legGeo, metalMat);
+      leg.position.set(x, -0.45, 0);
+      group.add(leg);
+    });
+
+    // Rear Jet Thruster
+    const thrusterGeo = new THREE.CylinderGeometry(0.2, 0.3, 0.5, 8);
+    thrusterGeo.rotateX(Math.PI / 2);
+    const thruster = new THREE.Mesh(thrusterGeo, glowMat);
+    thruster.position.set(0, 0.6, -0.45);
+    group.add(thruster);
+
+    const hitBox = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.8, 1.8), new THREE.MeshBasicMaterial({ visible: false }));
+    hitBox.name = "hitbox";
+    group.add(hitBox);
+
+    group.scale.set(1.4, 1.4, 1.4);
+    return group;
+  }
+
+  /**
+   * Generates an Ethereal Celestial Cosmic Being.
+   */
+  createCelestialMesh(accentColor = 0xffd700) {
+    const group = new THREE.Group();
+
+    // 1. Inner Core Energy Sphere
+    const coreGeo = new THREE.SphereGeometry(0.7, 24, 24);
+    const coreMat = new THREE.MeshBasicMaterial({ color: accentColor });
+    const core = new THREE.Mesh(coreGeo, coreMat);
+    group.add(core);
+
+    const auraGeo = new THREE.SphereGeometry(0.9, 16, 16);
+    const auraMat = new THREE.MeshBasicMaterial({
+      color: accentColor,
+      transparent: true,
+      opacity: 0.3,
+      blending: THREE.AdditiveBlending,
+    });
+    group.add(new THREE.Mesh(auraGeo, auraMat));
+
+    // 2. Gyroscopic Rotating Rings
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.8,
+    });
+    const ring1 = new THREE.Mesh(new THREE.TorusGeometry(1.4, 0.05, 12, 48), ringMat);
+    group.add(ring1);
+
+    const ring2 = new THREE.Mesh(new THREE.TorusGeometry(1.7, 0.04, 12, 48), ringMat);
+    ring2.rotation.x = Math.PI / 2.5;
+    group.add(ring2);
+
+    // Orbiting sacred crystals
+    for (let i = 0; i < 4; i++) {
+      const angle = (i / 4) * Math.PI * 2;
+      const crystalGeo = new THREE.OctahedronGeometry(0.2);
+      const crystal = new THREE.Mesh(crystalGeo, coreMat);
+      crystal.position.set(Math.cos(angle) * 1.5, Math.sin(angle) * 0.6, Math.sin(angle) * 1.5);
+      group.add(crystal);
+    }
+
+    const hitBox = new THREE.Mesh(new THREE.SphereGeometry(1.8, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
+    hitBox.name = "hitbox";
+    group.add(hitBox);
+
+    return group;
+  }
+
+  /**
+   * Unified character factory supporting all multiverse character types.
+   */
+  createCharacterMesh(type = "astronaut", accentColor = 0x00f0ff) {
+    switch (type) {
+      case "astronaut":
+      case "humanoid":
+        return this.createAstronautMesh(accentColor);
+      case "android":
+      case "mecha":
+        return this.createAndroidMesh(accentColor);
+      case "celestial":
+      case "cosmic":
+        return this.createCelestialMesh(accentColor);
+      case "vessel":
+      case "ship":
+      default:
+        return this.createSpaceshipMesh(accentColor);
+    }
   }
 
   setupInputs() {
@@ -320,29 +603,45 @@ export class PlayerSystem {
     this.camera.lookAt(lookTarget);
   }
 
+  parseColor(color, defaultColor = 0x00f0ff) {
+    if (typeof color === "number") return color;
+    if (typeof color === "string") {
+      const clean = color.replace("#", "0x");
+      const parsed = parseInt(clean, 16);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return defaultColor;
+  }
+
   /**
    * Adds or updates a remote player avatar in the space.
    */
   addOrUpdateRemotePlayer(sessionId, data) {
     let remote = this.remotePlayers.get(sessionId);
 
+    const characterType = data.characterType || "astronaut";
+    const colorHex = this.parseColor(data.color, 0xff0055);
+    const avatarUrl = data.avatarUrl || "";
+
     if (!remote) {
-      // Create remote avatar
-      const color = 0xff0055; // Distinct hostile / peer color
-      const mesh = this.createSpaceshipMesh(color);
+      // Create remote avatar based on character type and accent color
+      const mesh = this.createCharacterMesh(characterType, colorHex);
       mesh.userData.playerId = sessionId;
 
       const pilotName = data.name || `Pilot-${sessionId.slice(0, 4)}`;
 
-      // Create holographic nametag + health billboard above ship
+      // Create holographic nametag + health billboard above character
       const nametagSprite = this.createNametagSprite(pilotName, data.health || 100, false);
-      nametagSprite.position.set(0, 2.3, 0);
+      nametagSprite.position.set(0, 2.5, 0);
       mesh.add(nametagSprite);
 
       this.scene.add(mesh);
 
       remote = {
         mesh,
+        characterType,
+        colorHex,
+        avatarUrl,
         targetPos: new THREE.Vector3(data.x || 0, data.y || 0, data.z || 0),
         targetRot: data.rotation || 0,
         targetPitch: data.pitch || 0,
@@ -353,7 +652,21 @@ export class PlayerSystem {
 
       mesh.position.copy(remote.targetPos);
       this.remotePlayers.set(sessionId, remote);
+
+      // If custom GLB model URL was provided, attempt asynchronous load
+      if (avatarUrl && avatarUrl.trim()) {
+        this.loadRemoteCustomAvatar(sessionId, avatarUrl.trim());
+      }
     } else {
+      // Check if remote character type or color changed
+      if (
+        (data.characterType && data.characterType !== remote.characterType) ||
+        (data.color && colorHex !== remote.colorHex) ||
+        (data.avatarUrl !== undefined && data.avatarUrl !== remote.avatarUrl)
+      ) {
+        this.updateRemoteCharacter(sessionId, data);
+      }
+
       // Update target positions for smooth interpolation
       if (typeof data.x === "number") remote.targetPos.x = data.x;
       if (typeof data.y === "number") remote.targetPos.y = data.y;
@@ -371,6 +684,80 @@ export class PlayerSystem {
         this.updateNametagSprite(remote.nametagSprite, remote.name, remote.health);
       }
     }
+  }
+
+  updateRemoteCharacter(sessionId, data) {
+    const remote = this.remotePlayers.get(sessionId);
+    if (!remote) return;
+
+    if (data.characterType) remote.characterType = data.characterType;
+    if (data.color) remote.colorHex = this.parseColor(data.color, remote.colorHex);
+    if (data.avatarUrl !== undefined) remote.avatarUrl = data.avatarUrl;
+
+    const currentPos = remote.mesh.position.clone();
+    const currentQuat = remote.mesh.quaternion.clone();
+
+    // Preserve children like nametag and positional audio
+    const preservedChildren = [];
+    remote.mesh.traverse((child) => {
+      if (child === remote.nametagSprite || child.isPositionalAudio) {
+        preservedChildren.push(child);
+      }
+    });
+    preservedChildren.forEach((child) => remote.mesh.remove(child));
+
+    this.scene.remove(remote.mesh);
+
+    const newMesh = this.createCharacterMesh(remote.characterType, remote.colorHex);
+    newMesh.userData.playerId = sessionId;
+    newMesh.position.copy(currentPos);
+    newMesh.quaternion.copy(currentQuat);
+
+    preservedChildren.forEach((child) => newMesh.add(child));
+    this.scene.add(newMesh);
+    remote.mesh = newMesh;
+
+    if (remote.avatarUrl && remote.avatarUrl.trim()) {
+      this.loadRemoteCustomAvatar(sessionId, remote.avatarUrl.trim());
+    }
+  }
+
+  loadRemoteCustomAvatar(sessionId, avatarUrl) {
+    this.gltfLoader.load(
+      avatarUrl,
+      (gltf) => {
+        const remote = this.remotePlayers.get(sessionId);
+        if (!remote) return;
+
+        const model = gltf.scene;
+        model.scale.set(1.5, 1.5, 1.5);
+        model.userData.playerId = sessionId;
+
+        const currentPos = remote.mesh.position.clone();
+        const currentQuat = remote.mesh.quaternion.clone();
+
+        // Transfer children
+        const preservedChildren = [];
+        remote.mesh.traverse((child) => {
+          if (child === remote.nametagSprite || child.isPositionalAudio) {
+            preservedChildren.push(child);
+          }
+        });
+        preservedChildren.forEach((child) => remote.mesh.remove(child));
+
+        this.scene.remove(remote.mesh);
+        model.position.copy(currentPos);
+        model.quaternion.copy(currentQuat);
+        preservedChildren.forEach((child) => model.add(child));
+
+        this.scene.add(model);
+        remote.mesh = model;
+      },
+      undefined,
+      (err) => {
+        console.warn(`[PlayerSystem] Failed loading custom avatar for remote ${sessionId}:`, err);
+      }
+    );
   }
 
   removeRemotePlayer(sessionId) {

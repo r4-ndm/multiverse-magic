@@ -12,6 +12,9 @@ export class Player extends Schema {}
 defineTypes(Player, {
   id: "string",
   name: "string",
+  characterType: "string",
+  color: "string",
+  avatarUrl: "string",
   x: "number",
   y: "number",
   z: "number",

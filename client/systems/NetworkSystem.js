@@ -92,6 +92,10 @@ export class NetworkSystem {
       if (this.onNameChanged) this.onNameChanged(data.id, data.name);
     });
 
+    this.room.onMessage("character_changed", (data) => {
+      if (this.onCharacterChanged) this.onCharacterChanged(data.id, data);
+    });
+
     this.room.onMessage("player_joined", (data) => {
       const name = data.name || data.id.slice(0, 6);
       if (this.onLogEvent) this.onLogEvent(`Pilot [${name}] entered space`);
@@ -138,5 +142,10 @@ export class NetworkSystem {
   sendSignal(to, signal) {
     if (!this.room) return;
     this.room.send("signal", { to, signal });
+  }
+
+  sendSetCharacter(characterType, color, avatarUrl = "") {
+    if (!this.room) return;
+    this.room.send("set_character", { characterType, color, avatarUrl });
   }
 }

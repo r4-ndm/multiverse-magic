@@ -202,6 +202,8 @@ this.worldSystem.register(new CyberStation("alpha_station", new THREE.Vector3(50
 - [x] **When health reaches 0, the player is teleported to deep space (10000, 10000, 10000) and health resets to 100.**
 - [x] **The ejected player sees a deep space notification with distance counter, and other players receive the broadcast.**
 - [x] **Proximity audio naturally disconnects for the ejected player.**
+- [x] **Character and Avatar Customization:** Choose from Humanoid Astronaut, Cyber Mecha Android, Cosmic Celestial Being, Starfighter Vessel, or custom `.glb` 3D model with custom aura colors.
+- [x] **Dynamic In-Universe Morphing:** Press `H` or click `MORPH` in HUD to seamlessly transmute your avatar in real-time across the network.
 - [x] **Fully extensible architecture with `WorldObject` base class and documented server protocol.**
 
 ---

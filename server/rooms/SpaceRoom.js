@@ -93,6 +93,23 @@ export class SpaceRoom extends Room {
       }
     });
 
+    // Dynamic character morph / customization handler
+    this.onMessage("set_character", (client, data) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player || !data) return;
+
+      if (typeof data.characterType === "string") player.characterType = data.characterType;
+      if (typeof data.color === "string") player.color = data.color;
+      if (typeof data.avatarUrl === "string") player.avatarUrl = data.avatarUrl;
+
+      this.broadcast("character_changed", {
+        id: client.sessionId,
+        characterType: player.characterType,
+        color: player.color,
+        avatarUrl: player.avatarUrl,
+      });
+    });
+
     // Health regeneration loop: +1 HP per second when not taking damage
     this.clock.setInterval(() => {
       const now = Date.now();
@@ -185,6 +202,9 @@ export class SpaceRoom extends Room {
     const player = new Player();
     player.id = client.sessionId;
     player.name = pilotName;
+    player.characterType = options.characterType || "astronaut";
+    player.color = options.color || "#00f0ff";
+    player.avatarUrl = options.avatarUrl || "";
     player.x = (Math.random() - 0.5) * 30;
     player.y = (Math.random() - 0.5) * 10;
     player.z = (Math.random() - 0.5) * 30;
@@ -195,7 +215,16 @@ export class SpaceRoom extends Room {
     this.state.players.set(client.sessionId, player);
 
     // Notify clients of new entrant
-    this.broadcast("player_joined", { id: client.sessionId, name: pilotName }, { except: client });
+    this.broadcast(
+      "player_joined",
+      {
+        id: client.sessionId,
+        name: pilotName,
+        characterType: player.characterType,
+        color: player.color,
+      },
+      { except: client }
+    );
   }
 
   onLeave(client, consented) {

@@ -47,13 +47,17 @@ class OpenSpaceApp {
 
     // 3. Initialize Overlay UI and entry flow
     this.overlay.init(
-      async (pilotName) => {
-        await this.handleUserEntry(pilotName);
+      async (pilotName, characterType, color, avatarUrl) => {
+        await this.handleUserEntry(pilotName, characterType, color, avatarUrl);
       },
       (text) => {
         if (this.networkSystem?.room) {
           this.networkSystem.room.send("chat", text);
         }
+      },
+      (newType, newColor, newUrl) => {
+        this.playerSystem.setLocalCharacter(newType, newColor, newUrl);
+        this.networkSystem.sendSetCharacter(newType, newColor, newUrl);
       }
     );
 
@@ -61,10 +65,11 @@ class OpenSpaceApp {
     this.animate();
   }
 
-  async handleUserEntry(pilotName) {
-    console.log(`[OpenSpaceApp] Pilot [${pilotName}] entered space. Initializing Audio & Network...`);
+  async handleUserEntry(pilotName, characterType = "astronaut", color = "#00f0ff", avatarUrl = "") {
+    console.log(`[OpenSpaceApp] Pilot [${pilotName}] (${characterType}) entered space. Initializing Audio & Network...`);
     this.pilotName = pilotName || `Pilot-${Math.floor(1000 + Math.random() * 9000)}`;
     this.playerSystem.setLocalName(this.pilotName);
+    this.playerSystem.setLocalCharacter(characterType, color, avatarUrl);
 
     // 1. Audio Activation: user gesture enables AudioContext & getUserMedia mic stream
     const audioResult = await this.audioSystem.init(this.networkSystem, this.playerSystem);
@@ -76,9 +81,14 @@ class OpenSpaceApp {
 
     // 2. Connect to Colyseus Server
     try {
-      const room = await this.networkSystem.connect(null, { name: this.pilotName });
+      const room = await this.networkSystem.connect(null, {
+        name: this.pilotName,
+        characterType,
+        color,
+        avatarUrl,
+      });
       this.overlay.setPlayerInfo(room.sessionId, room.name, this.pilotName);
-      this.overlay.addLogItem(`🌌 Pilot [${this.pilotName}] connected to Sector [${room.id}]`);
+      this.overlay.addLogItem(`🌌 Pilot [${this.pilotName}] connected to Sector [${room.id}] as [${characterType.toUpperCase()}]`);
 
       // Initialize Combat System with network and audio
       this.combatSystem.init(this.networkSystem, this.playerSystem, this.audioSystem);
@@ -106,7 +116,17 @@ class OpenSpaceApp {
         // Remote peer
         this.playerSystem.addOrUpdateRemotePlayer(sessionId, playerState);
         const name = playerState.name || sessionId.slice(0, 6);
-        this.overlay.addLogItem(`Pilot [${name}] materialized nearby`);
+        const form = (playerState.characterType || "pilot").toUpperCase();
+        this.overlay.addLogItem(`Pilot [${name}] materialized nearby as [${form}]`);
+      }
+    };
+
+    // Dynamic morph handler from remote peers
+    this.networkSystem.onCharacterChanged = (id, data) => {
+      if (id !== this.networkSystem.sessionId) {
+        this.playerSystem.updateRemoteCharacter(id, data);
+        const name = data.name || id.slice(0, 6);
+        this.overlay.addLogItem(`✨ Pilot [${name}] transmuted into [${(data.characterType || "form").toUpperCase()}]`);
       }
     };
 

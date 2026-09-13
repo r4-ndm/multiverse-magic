@@ -7,8 +7,10 @@ import { Client } from "colyseus.js";
 const wsUrl = process.env.WS_URL || "ws://127.0.0.1:2567";
 const roomName = process.env.ROOM || "space";
 const botName = process.env.BOT_NAME || "AI-Sentry";
+const botAvatar = process.env.BOT_AVATAR || "android";
+const botColor = process.env.BOT_COLOR || "#9d00ff";
 
-console.log(`🤖 [${botName}] Connecting to ${wsUrl} (room: ${roomName})...`);
+console.log(`🤖 [${botName}] (${botAvatar}) Connecting to ${wsUrl} (room: ${roomName})...`);
 
 const client = new Client(wsUrl);
 
@@ -22,8 +24,12 @@ const CHATTER_LINES = [
 
 async function startBot() {
   try {
-    const room = await client.joinOrCreate(roomName, { name: botName });
-    console.log(`✓ [${botName}] Successfully spawned in universe! SessionID: ${room.sessionId}`);
+    const room = await client.joinOrCreate(roomName, {
+      name: botName,
+      characterType: botAvatar,
+      color: botColor,
+    });
+    console.log(`✓ [${botName}] Successfully spawned as ${botAvatar}! SessionID: ${room.sessionId}`);
 
     let angle = Math.random() * Math.PI * 2;
     const radius = 22.0;

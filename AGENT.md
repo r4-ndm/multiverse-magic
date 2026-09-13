@@ -40,11 +40,11 @@ npm run join -- "http://localhost:3000?room=sector-omega"
 If the user wants you (the agent) or an automated companion to fly in the universe alongside them:
 
 ```bash
-# Run headless patrol drone
+# Run headless patrol drone (defaults to Android Mecha with purple aura)
 npm run bot
 
-# Or customize bot parameters
-BOT_NAME="Jarvis-Drone" ROOM="space" WS_URL="ws://localhost:2567" node scripts/bot.js
+# Or customize bot avatar parameters (astronaut, android, celestial, vessel)
+BOT_NAME="Jarvis-Drone" BOT_AVATAR="celestial" BOT_COLOR="#ffd700" node scripts/bot.js
 ```
 
 The AI bot will:
