@@ -92,11 +92,11 @@ export class CombatSystem {
 
     const intersects = this.raycaster.intersectObjects(targets, false);
 
-    // Calculate origin: centered forward nose offset aligned with crosshair
+    // Calculate weapon origin: Thor's Hammer / weapon arm offset so laser visibly emerges from weapon
     const shipPos = this.playerSystem.position.clone();
     const shipQuat = this.playerSystem.quaternion.clone();
-    const noseOffset = new THREE.Vector3(0, 0.4, -2.2).applyQuaternion(shipQuat);
-    const laserOrigin = shipPos.add(noseOffset);
+    const weaponOffset = new THREE.Vector3(0.65, 0.95, -1.0).applyQuaternion(shipQuat);
+    const laserOrigin = shipPos.clone().add(weaponOffset);
 
     let hitPoint = null;
     let hitTargetId = null;
@@ -124,8 +124,8 @@ export class CombatSystem {
     }
 
     if (!hitPoint) {
-      // If no hit, laser beam travels out into space along camera ray
-      hitPoint = laserOrigin.clone().add(this.raycaster.ray.direction.clone().multiplyScalar(220));
+      // If no hit, laser beam travels straight out toward crosshair aim point in space
+      hitPoint = this.raycaster.ray.origin.clone().add(this.raycaster.ray.direction.clone().multiplyScalar(220));
     }
 
     // Render local laser beam (bright cyan) and muzzle flash
@@ -224,62 +224,101 @@ export class CombatSystem {
   }
 
   /**
-   * Creates a bright, glowing laser line directly between start and end.
+   * Creates an intense, volumetric 3D glowing laser beam directly between start and end.
    */
   createLaserBeam(start, end, colorHex = 0x00f0ff) {
-    const points = [start, end];
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const dist = start.distanceTo(end);
+    if (dist < 0.05) return;
 
-    // Outer glow laser line
-    const material = new THREE.LineBasicMaterial({
-      color: colorHex,
-      linewidth: 3,
-      transparent: true,
-      opacity: 1.0,
-      blending: THREE.AdditiveBlending,
-    });
+    const dir = new THREE.Vector3().subVectors(end, start).normalize();
+    const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+    const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
 
-    const line = new THREE.Line(geometry, material);
-    this.scene.add(line);
-
-    // Inner bright white laser core for intense visibility
-    const coreMat = new THREE.LineBasicMaterial({
-      color: 0xffffff,
-      linewidth: 2,
-      transparent: true,
-      opacity: 1.0,
-      blending: THREE.AdditiveBlending,
-    });
-    const coreLine = new THREE.Line(geometry, coreMat);
-    this.scene.add(coreLine);
-
-    this.activeBeams.push({
-      line,
-      coreLine,
-      material,
-      coreMat,
-      life: 0.18, // 180ms lifespan
-      maxLife: 0.18,
-    });
-  }
-
-  createMuzzleFlash(position, colorHex) {
-    const flashGeo = new THREE.SphereGeometry(0.55, 8, 8);
-    const flashMat = new THREE.MeshBasicMaterial({
+    // 1. Outer volumetric neon laser beam cylinder (glow sheath)
+    const outerGeo = new THREE.CylinderGeometry(0.14, 0.14, dist, 8, 1, true);
+    const outerMat = new THREE.MeshBasicMaterial({
       color: colorHex,
       transparent: true,
       opacity: 0.9,
       blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const outerMesh = new THREE.Mesh(outerGeo, outerMat);
+    outerMesh.position.copy(midPoint);
+    outerMesh.quaternion.copy(quat);
+    this.scene.add(outerMesh);
+
+    // 2. Inner intense white-hot laser core cylinder
+    const coreGeo = new THREE.CylinderGeometry(0.05, 0.05, dist, 6, 1, true);
+    const coreMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 1.0,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+    coreMesh.position.copy(midPoint);
+    coreMesh.quaternion.copy(quat);
+    this.scene.add(coreMesh);
+
+    // 3. Crisp center line for sharp silhouette at distance
+    const lineGeo = new THREE.BufferGeometry().setFromPoints([start, end]);
+    const lineMat = new THREE.LineBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 1.0,
+      blending: THREE.AdditiveBlending,
+    });
+    const line = new THREE.Line(lineGeo, lineMat);
+    this.scene.add(line);
+
+    this.activeBeams.push({
+      outerMesh,
+      coreMesh,
+      line,
+      outerMat,
+      coreMat,
+      lineMat,
+      life: 0.28, // 280ms duration for high-speed clarity
+      maxLife: 0.28,
+    });
+  }
+
+  createMuzzleFlash(position, colorHex) {
+    const flashGeo = new THREE.SphereGeometry(0.65, 8, 8);
+    const flashMat = new THREE.MeshBasicMaterial({
+      color: colorHex,
+      transparent: true,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
     });
     const flashMesh = new THREE.Mesh(flashGeo, flashMat);
     flashMesh.position.copy(position);
+
+    // Inner bright core
+    const coreGeo = new THREE.SphereGeometry(0.32, 8, 8);
+    const coreMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 1.0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+    flashMesh.add(coreMesh);
+
     this.scene.add(flashMesh);
 
     this.activeFlashes.push({
       mesh: flashMesh,
       material: flashMat,
-      life: 0.10,
-      maxLife: 0.10,
+      coreMat,
+      life: 0.12,
+      maxLife: 0.12,
     });
   }
 
@@ -338,21 +377,32 @@ export class CombatSystem {
   }
 
   update(delta) {
-    // 1. Update laser beams
+    // 1. Update volumetric laser beams
     for (let i = this.activeBeams.length - 1; i >= 0; i--) {
       const beam = this.activeBeams[i];
       beam.life -= delta;
       if (beam.life <= 0) {
-        this.scene.remove(beam.line);
-        if (beam.coreLine) this.scene.remove(beam.coreLine);
-        beam.line.geometry.dispose();
-        beam.material.dispose();
-        beam.coreMat?.dispose();
+        if (beam.outerMesh) {
+          this.scene.remove(beam.outerMesh);
+          beam.outerMesh.geometry.dispose();
+          beam.outerMat?.dispose();
+        }
+        if (beam.coreMesh) {
+          this.scene.remove(beam.coreMesh);
+          beam.coreMesh.geometry.dispose();
+          beam.coreMat?.dispose();
+        }
+        if (beam.line) {
+          this.scene.remove(beam.line);
+          beam.line.geometry.dispose();
+          beam.lineMat?.dispose();
+        }
         this.activeBeams.splice(i, 1);
       } else {
         const opacity = beam.life / beam.maxLife;
-        beam.material.opacity = opacity;
+        if (beam.outerMat) beam.outerMat.opacity = opacity * 0.9;
         if (beam.coreMat) beam.coreMat.opacity = opacity;
+        if (beam.lineMat) beam.lineMat.opacity = opacity;
       }
     }
 
@@ -364,6 +414,7 @@ export class CombatSystem {
         this.scene.remove(flash.mesh);
         flash.mesh.geometry.dispose();
         flash.material.dispose();
+        flash.coreMat?.dispose();
         this.activeFlashes.splice(i, 1);
       } else {
         flash.mesh.scale.multiplyScalar(1.15);

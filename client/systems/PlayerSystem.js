@@ -37,9 +37,12 @@ export class PlayerSystem {
       boost: false,
     };
 
-    // Third-person camera offset
-    this.cameraOffset = new THREE.Vector3(0, 3.5, 9.0);
-    this.cameraLookOffset = new THREE.Vector3(0, 1.2, -8.0);
+    // Third-person over-the-shoulder camera offset
+    // Offsets camera to the right so the avatar (and wizard hat) is framed on the left,
+    // providing a clear, unoccluded view of the crosshair, Thor's Hammer, and laser fire.
+    this.cameraDistance = 7.5;
+    this.cameraOffset = new THREE.Vector3(1.5, 2.5, 7.5);
+    this.cameraLookOffset = new THREE.Vector3(0.35, 1.3, -16.0);
     this.currentCameraPos = new THREE.Vector3();
 
     // Remote players registry: sessionId -> { mesh, targetPos, targetRot, healthSprite, trail }
@@ -787,6 +790,18 @@ export class PlayerSystem {
 
       this.quaternion.setFromEuler(this.euler);
     });
+
+    // Mouse wheel zoom to adjust camera distance dynamically
+    window.addEventListener(
+      "wheel",
+      (e) => {
+        if (!this.isPointerLocked) return;
+        this.cameraDistance = Math.max(4.2, Math.min(11.5, this.cameraDistance + (e.deltaY > 0 ? 0.6 : -0.6)));
+        const scale = this.cameraDistance / 7.5;
+        this.cameraOffset.set(1.5 * scale, 2.5 * scale, this.cameraDistance);
+      },
+      { passive: true }
+    );
   }
 
   /**
@@ -836,14 +851,15 @@ export class PlayerSystem {
   }
 
   updateCamera(delta) {
-    // Ideal camera position behind and above the ship
+    // Ideal over-the-shoulder camera position behind and to the right of avatar
     const targetCamOffset = this.cameraOffset.clone().applyQuaternion(this.quaternion);
     const targetCamPos = this.position.clone().add(targetCamOffset);
 
-    // Lerp camera position for cinematic trailing feel
-    this.camera.position.lerp(targetCamPos, 0.14);
+    // Smooth, frame-rate independent camera chase
+    const lerpFactor = 1.0 - Math.exp(-14.0 * delta);
+    this.camera.position.lerp(targetCamPos, lerpFactor);
 
-    // Camera look-at target slightly in front of the ship
+    // Camera look-at target slightly in front of the avatar
     const lookTarget = this.position.clone().add(
       this.cameraLookOffset.clone().applyQuaternion(this.quaternion)
     );
