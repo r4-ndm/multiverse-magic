@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenSpace — 3D Proximity Chat Universe</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --neon-cyan: #00f0ff;
+      --neon-pink: #ff0055;
+      --neon-purple: #9d00ff;
+      --neon-green: #00ff66;
+      --dark-bg: rgba(6, 8, 15, 0.85);
+      --glass-border: rgba(0, 240, 255, 0.25);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000000;
+      color: #e0f2fe;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      display: block;
+    }
+
+    /* Reticle / Crosshair */
+    #crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 24px;
+      height: 24px;
+      pointer-events: none;
+      z-index: 10;
+      display: none;
+    }
+    #crosshair::before, #crosshair::after {
+      content: '';
+      position: absolute;
+      background-color: rgba(0, 240, 255, 0.7);
+      box-shadow: 0 0 6px rgba(0, 240, 255, 0.9);
+    }
+    #crosshair::before {
+      top: 11px;
+      left: 0;
+      width: 24px;
+      height: 2px;
+    }
+    #crosshair::after {
+      top: 0;
+      left: 11px;
+      width: 2px;
+      height: 24px;
+    }
+    #crosshair-center {
+      position: absolute;
+      top: 9px;
+      left: 9px;
+      width: 6px;
+      height: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      border-radius: 50%;
+    }
+
+    /* Damage Screen Vignette */
+    #damage-vignette {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 8;
+      box-shadow: inset 0 0 120px rgba(255, 0, 85, 0);
+      transition: box-shadow 0.25s ease-out;
+    }
+    #damage-vignette.critical {
+      box-shadow: inset 0 0 160px rgba(255, 0, 85, 0.65);
+      animation: pulse-danger 1.2s infinite ease-in-out;
+    }
+    @keyframes pulse-danger {
+      0%, 100% { box-shadow: inset 0 0 120px rgba(255, 0, 85, 0.45); }
+      50% { box-shadow: inset 0 0 190px rgba(255, 0, 85, 0.85); }
+    }
+
+    /* Top/Bottom HUD Layer */
+    #hud {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 15;
+      display: none;
+      padding: 18px;
+    }
+
+    .hud-panel {
+      background: var(--dark-bg);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(8px);
+      border-radius: 8px;
+      padding: 12px 18px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Top Left: Logo & Coordinates */
+    #status-panel {
+      position: absolute;
+      top: 18px;
+      left: 18px;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    #status-panel .title {
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 800;
+      font-size: 16px;
+      color: var(--neon-cyan);
+      letter-spacing: 2px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--neon-green);
+      box-shadow: 0 0 8px var(--neon-green);
+    }
+    .status-dot.ejected {
+      background: var(--neon-pink);
+      box-shadow: 0 0 8px var(--neon-pink);
+    }
+
+    /* Bottom Left: Player Health & Mic */
+    #health-panel {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      min-width: 260px;
+    }
+    .health-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-weight: 700;
+      font-size: 13px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    #health-bar-container {
+      width: 100%;
+      height: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid rgba(0, 240, 255, 0.3);
+    }
+    #health-bar-fill {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, #00f0ff, #00ff88);
+      box-shadow: 0 0 10px #00f0ff;
+      transition: width 0.2s ease, background 0.3s ease;
+    }
+    #health-bar-fill.danger {
+      background: linear-gradient(90deg, #ff0055, #ff5500);
+      box-shadow: 0 0 12px #ff0055;
+    }
+
+    /* Bottom Right: Controls & Voice Status */
+    #voice-controls-panel {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      text-align: right;
+      font-size: 12px;
+    }
+    .voice-status {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      color: var(--neon-cyan);
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .keybind-hint {
+      color: rgba(224, 242, 254, 0.6);
+      font-size: 11px;
+    }
+
+    /* Top Right: Ejection & Event Feed */
+    #event-log {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      width: 320px;
+      max-height: 220px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 11px;
+      pointer-events: none;
+    }
+    .log-item {
+      background: rgba(6, 8, 15, 0.75);
+      border-left: 3px solid var(--neon-cyan);
+      padding: 6px 10px;
+      border-radius: 4px;
+      animation: fadeInLog 0.3s ease-out;
+      backdrop-filter: blur(4px);
+    }
+    .log-item.alert {
+      border-left-color: var(--neon-pink);
+      color: #ff99aa;
+      font-weight: 700;
+    }
+    @keyframes fadeInLog {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    /* Center Alert Banner for Ejection */
+    #ejection-banner {
+      position: absolute;
+      top: 28%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 0, 85, 0.92);
+      border: 2px solid #ffffff;
+      color: #ffffff;
+      padding: 24px 38px;
+      border-radius: 12px;
+      box-shadow: 0 0 50px rgba(255, 0, 85, 0.9);
+      text-align: center;
+      z-index: 100;
+      display: none;
+      animation: alertPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    #ejection-banner h2 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 26px;
+      margin-bottom: 8px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    #ejection-banner p {
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    @keyframes alertPop {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+      100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    }
+
+    /* Start Overlay */
+    #entry-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at center, rgba(10, 15, 30, 0.92) 0%, rgba(2, 3, 6, 0.98) 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      backdrop-filter: blur(12px);
+    }
+
+    .entry-card {
+      max-width: 540px;
+      width: 90%;
+      padding: 40px;
+      border-radius: 16px;
+      background: rgba(12, 18, 32, 0.85);
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 0 40px rgba(0, 240, 255, 0.15);
+      text-align: center;
+    }
+
+    .entry-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 36px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #00f0ff, #9d00ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+      letter-spacing: 3px;
+    }
+
+    .entry-tagline {
+      font-size: 13px;
+      color: rgba(224, 242, 254, 0.7);
+      margin-bottom: 28px;
+      letter-spacing: 1px;
+    }
+
+    .feature-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 30px;
+      text-align: left;
+    }
+
+    .feature-item {
+      background: rgba(255, 255, 255, 0.04);
+      padding: 10px 14px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 11px;
+    }
+    .feature-item span {
+      display: block;
+      color: var(--neon-cyan);
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+
+    #enter-btn {
+      width: 100%;
+      padding: 16px 24px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 16px;
+      font-weight: 800;
+      color: #050811;
+      background: linear-gradient(135deg, #00f0ff, #00ff88);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 0 24px rgba(0, 240, 255, 0.6);
+      transition: all 0.2s ease;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    #enter-btn:hover {
+      transform: scale(1.02);
+      box-shadow: 0 0 34px rgba(0, 240, 255, 0.9);
+    }
+
+    .controls-summary {
+      margin-top: 24px;
+      font-size: 11px;
+      color: rgba(224, 242, 254, 0.5);
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="webgl-canvas"></canvas>
+
+  <div id="crosshair">
+    <div id="crosshair-center"></div>
+  </div>
+
+  <div id="damage-vignette"></div>
+
+  <!-- HUD Overlay -->
+  <div id="hud">
+    <!-- Top Left: Space Room & Coordinates -->
+    <div id="status-panel" class="hud-panel">
+      <div class="title">
+        <span class="status-dot" id="status-dot"></span>
+        OPENSPACE // <span id="hud-room-id">SPACE</span>
+      </div>
+      <div>PILOT ID: <span id="hud-player-id" style="color:var(--neon-cyan)">...</span></div>
+      <div>POS: <span id="hud-coords">X: 0.0 | Y: 0.0 | Z: 0.0</span></div>
+      <div>PROXIMITY RAD: <span style="color:var(--neon-green)">50u</span></div>
+    </div>
+
+    <!-- Top Right: Event Log -->
+    <div id="event-log"></div>
+
+    <!-- Center Ejection Banner -->
+    <div id="ejection-banner">
+      <h2>DEEP SPACE EJECTION</h2>
+      <p id="ejection-text">You sustained critical damage and were ejected into deep space!</p>
+      <p style="margin-top:8px; font-weight:700; color:#fff;" id="ejection-distance">Distance to sector center: 17,320 units</p>
+    </div>
+
+    <!-- Bottom Left: Health -->
+    <div id="health-panel" class="hud-panel">
+      <div class="health-label-row">
+        <span>Hull Integrity</span>
+        <span id="health-value">100%</span>
+      </div>
+      <div id="health-bar-container">
+        <div id="health-bar-fill"></div>
+      </div>
+    </div>
+
+    <!-- Bottom Right: Voice & Controls -->
+    <div id="voice-controls-panel" class="hud-panel">
+      <div class="voice-status">
+        <span id="voice-icon">🎙️</span>
+        <span id="voice-status-text">Mic: Inactive</span>
+      </div>
+      <div class="keybind-hint">
+        WASD: Fly & Strafe | Space/C: Ascend/Descend<br/>
+        Left Click: Shoot Laser | M: Mute Mic | Tab: Pointer Lock
+      </div>
+    </div>
+  </div>
+
+  <!-- Entry Screen Modal -->
+  <div id="entry-overlay">
+    <div class="entry-card">
+      <h1 class="entry-title">OPENSPACE</h1>
+      <p class="entry-tagline">A Permissionless 3D Proximity Chat Universe</p>
+
+      <div class="feature-list">
+        <div class="feature-item">
+          <span>ZERO FRICTION</span>
+          No logins, no gatekeepers. The URL is the universe.
+        </div>
+        <div class="feature-item">
+          <span>3D SPATIAL AUDIO</span>
+          Hear others in true 3D based on distance and direction.
+        </div>
+        <div class="feature-item">
+          <span>PEER-TO-PEER WEBRTC</span>
+          Voice streams directly between nearby pilots.
+        </div>
+        <div class="feature-item">
+          <span>COMMUNITY EJECTION</span>
+          Defend your space. Shoot trolls into deep space.
+        </div>
+      </div>
+
+      <button id="enter-btn">CLICK TO ENTER SPACE</button>
+
+      <div class="controls-summary">
+        Microphone access requested on enter for proximity chat.<br/>
+        If mic is denied, you can still explore and listen.
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/main.js"></script>
+</body>
+</html>

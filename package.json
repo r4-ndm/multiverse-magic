@@ -1,0 +1,37 @@
+{
+  "name": "multiverse-magic",
+  "version": "1.0.0",
+  "description": "Multiverse Magic — A Permissionless 3D Proximity Chat Universe",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "server": "node server/index.js",
+    "client": "vite client --port 3000 --host",
+    "dev": "concurrently -n \"server,client\" -c \"cyan,magenta\" \"node server/index.js\" \"vite client --port 3000 --host\""
+  },
+  "keywords": [
+    "threejs",
+    "colyseus",
+    "webrtc",
+    "spatial-audio",
+    "metaverse",
+    "3d",
+    "proximity-chat"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@colyseus/schema": "^2.0.36",
+    "@colyseus/ws-transport": "^0.15.1",
+    "colyseus": "^0.15.17",
+    "colyseus.js": "^0.15.28",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "three": "^0.186.0"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5",
+    "vite": "^8.3.0"
+  }
+}
