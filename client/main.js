@@ -6,6 +6,7 @@ import { AudioSystem } from "./systems/AudioSystem.js";
 import { CombatSystem } from "./systems/CombatSystem.js";
 import { WorldSystem, PlanetBeacon, HyperlaneGate } from "./systems/WorldObject.js";
 import { CustomPlanet } from "./systems/Planet.js";
+import { CosmicTV } from "./systems/CosmicTV.js";
 import { Overlay } from "./ui/Overlay.js";
 
 /**
@@ -28,6 +29,7 @@ class OpenSpaceApp {
     this.combatSystem = null;
     this.worldSystem = null;
     this.hyperlaneGate = null;
+    this.cosmicTV = null;
 
     this.isEntered = false;
   }
@@ -76,6 +78,10 @@ class OpenSpaceApp {
     this.worldSystem.register(new PlanetBeacon("nexus_beacon", new THREE.Vector3(0, -120, -350), 45));
     this.hyperlaneGate = new HyperlaneGate("main_hyperlane_gate", new THREE.Vector3(0, 15, -150), gateDestName, gateDestUrl, gateDist);
     this.worldSystem.register(this.hyperlaneGate);
+
+    // Register Flying Retro-Futuristic Cosmic Web TV in orbit
+    this.cosmicTV = new CosmicTV("cosmic_tv_sol", new THREE.Vector3(-38, 12, -65));
+    this.worldSystem.register(this.cosmicTV);
 
     // Keyboard trigger: KeyJ for Hyperdrive Jump or Starmap
     window.addEventListener("keydown", (e) => {
@@ -130,6 +136,10 @@ class OpenSpaceApp {
         }
         planetConfig.position = { x: spawnPos.x, y: spawnPos.y, z: spawnPos.z };
         this.networkSystem.sendBuildPlanet(planetConfig);
+      },
+      (url, title) => {
+        this.networkSystem.sendTuneTV(url, title);
+        this.cosmicTV?.setChannel(url, title);
       }
     );
 
@@ -324,6 +334,22 @@ class OpenSpaceApp {
 
     this.networkSystem.onPlanetDeleted = (planetId) => {
       this.worldSystem.unregister(planetId);
+    };
+
+    // 10. Cosmic TV Network Synchronization
+    this.networkSystem.onTVSync = (tvData) => {
+      if (tvData && tvData.url) {
+        this.cosmicTV?.setChannel(tvData.url, tvData.title);
+        this.overlay?.setTVSyncState(tvData);
+      }
+    };
+
+    this.networkSystem.onTVTuned = (tvData) => {
+      if (tvData && tvData.url) {
+        this.cosmicTV?.setChannel(tvData.url, tvData.title);
+        this.overlay?.setTVSyncState(tvData);
+        this.overlay?.addLogItem(`📺 [COSMIC TV] Pilot [${tvData.tunedBy || "Pilot"}] tuned broadcast to: "${tvData.title || tvData.url}"`);
+      }
     };
   }
 

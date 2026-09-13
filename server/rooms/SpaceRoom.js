@@ -20,6 +20,13 @@ export class SpaceRoom extends Room {
     this.planets = new Map(); // planetId -> planetData
     this.loadPlanets();
 
+    this.tvChannel = {
+      url: "https://en.wikipedia.org/wiki/Solar_System",
+      title: "Wikipedia: Solar System",
+      tunedBy: "Multiverse Core",
+      timestamp: Date.now(),
+    };
+
     console.log(`[SpaceRoom] Created room with id: ${this.roomId}`);
 
     // Movement message handler: throttled sync from clients
@@ -174,6 +181,34 @@ export class SpaceRoom extends Room {
       }
     });
 
+    // Cosmic TV Channel Tune Handler
+    this.onMessage("tune_tv", (client, data) => {
+      const player = this.state.players.get(client.sessionId);
+      const pilotName = player?.name || `Pilot-${client.sessionId.slice(0, 4)}`;
+
+      let url = String(data?.url || "https://en.wikipedia.org/wiki/Solar_System").trim();
+      if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        url = `https://${url}`;
+      }
+
+      this.tvChannel = {
+        url,
+        title: String(data?.title || url).slice(0, 48),
+        tunedBy: pilotName,
+        timestamp: Date.now(),
+      };
+
+      console.log(`[SpaceRoom] Pilot [${pilotName}] tuned Cosmic TV to: ${url}`);
+      this.broadcast("tv_tuned", this.tvChannel);
+
+      this.broadcast("chat", {
+        senderId: "TV_BROADCAST",
+        senderName: "📺 COSMIC TV",
+        text: `Pilot [${pilotName}] tuned the Flying TV to: ${this.tvChannel.title || url}`,
+        timestamp: Date.now(),
+      });
+    });
+
     // Health regeneration loop: +1 HP per second when not taking damage
     this.clock.setInterval(() => {
       const now = Date.now();
@@ -292,6 +327,9 @@ export class SpaceRoom extends Room {
 
     // Synchronize all persistent planets in the sector to the joining client
     client.send("planets_sync", Array.from(this.planets.values()));
+
+    // Synchronize current Cosmic TV channel to joining client
+    client.send("tv_sync", this.tvChannel);
   }
 
   loadPlanets() {

@@ -24,6 +24,11 @@ export class NetworkSystem {
     this.onChatMessage = null;
     this.onNameChanged = null;
     this.onLogEvent = null;
+    this.onPlanetsSync = null;
+    this.onPlanetCreated = null;
+    this.onPlanetDeleted = null;
+    this.onTVSync = null;
+    this.onTVTuned = null;
   }
 
   async connect(serverUrl, options = {}) {
@@ -128,6 +133,15 @@ export class NetworkSystem {
     this.room.onMessage("planet_deleted", (data) => {
       if (this.onPlanetDeleted) this.onPlanetDeleted(data.id);
     });
+
+    // Cosmic TV Synchronization Handlers
+    this.room.onMessage("tv_sync", (data) => {
+      if (this.onTVSync) this.onTVSync(data);
+    });
+
+    this.room.onMessage("tv_tuned", (data) => {
+      if (this.onTVTuned) this.onTVTuned(data);
+    });
   }
 
   /**
@@ -186,5 +200,10 @@ export class NetworkSystem {
   sendDeletePlanet(planetId) {
     if (!this.room) return;
     this.room.send("delete_planet", { id: planetId });
+  }
+
+  sendTuneTV(url, title = "") {
+    if (!this.room) return;
+    this.room.send("tune_tv", { url, title });
   }
 }

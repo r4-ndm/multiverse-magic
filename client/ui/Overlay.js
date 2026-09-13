@@ -37,14 +37,19 @@ export class Overlay {
     this.hudCameraBtn = document.getElementById("hud-camera-btn");
     this.hudStarmapBtn = document.getElementById("hud-starmap-btn");
     this.hudBuildBtn = document.getElementById("hud-build-btn");
+    this.hudTvBtn = document.getElementById("hud-tv-btn");
     this.starmapModal = document.getElementById("starmap-modal");
     this.planetModal = document.getElementById("planet-modal");
+    this.cosmicTvModal = document.getElementById("cosmic-tv-modal");
     this.onCameraToggle = null;
     this.hyperlaneGate = null;
     this.onBuildPlanetCallback = null;
+    this.onTuneTV = null;
+    this.currentTVUrl = "https://en.wikipedia.org/wiki/Space_exploration";
+    this.currentTVTitle = "Wikipedia — Space Exploration";
   }
 
-  init(onEnter, onChatSend, onMorph, onCameraToggle = null, hyperlaneGate = null, playerSystem = null, audioSystem = null, onBuildPlanet = null) {
+  init(onEnter, onChatSend, onMorph, onCameraToggle = null, hyperlaneGate = null, playerSystem = null, audioSystem = null, onBuildPlanet = null, onTuneTV = null) {
     this.onEnterCallback = onEnter;
     this.onChatSend = onChatSend;
     this.onMorphCallback = onMorph;
@@ -53,6 +58,7 @@ export class Overlay {
     this.playerSystem = playerSystem;
     this.audioSystem = audioSystem;
     this.onBuildPlanetCallback = onBuildPlanet;
+    this.onTuneTV = onTuneTV;
 
     // Load default pilot callsign if a real custom name was previously saved
     const savedName = localStorage.getItem("pilot_callsign");
@@ -71,6 +77,9 @@ export class Overlay {
 
     // Initialize in-game planet builder modal
     this.setupPlanetModal();
+
+    // Initialize in-game Cosmic TV modal
+    this.setupCosmicTVModal();
 
     this.enterBtn.addEventListener("click", async () => {
       if (this.isEntered) return;
@@ -139,6 +148,16 @@ export class Overlay {
         if (document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
           this.togglePlanetModal();
           e.preventDefault();
+        }
+      } else if (e.code === "KeyE" && this.isEntered) {
+        // Toggle Cosmic TV modal with E key
+        if (document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
+          this.toggleCosmicTVModal();
+          e.preventDefault();
+        }
+      } else if (e.code === "Escape") {
+        if (this.cosmicTvModal && (this.cosmicTvModal.style.display === "flex" || this.cosmicTvModal.style.display === "block")) {
+          this.closeCosmicTVModal();
         }
       }
     });
@@ -692,6 +711,161 @@ export class Overlay {
     this.planetModal.style.display = "none";
     if (this.isEntered) {
       document.getElementById("webgl-canvas")?.requestPointerLock();
+    }
+  }
+
+  setupCosmicTVModal() {
+    if (this.hudTvBtn) {
+      this.hudTvBtn.addEventListener("click", () => {
+        this.toggleCosmicTVModal();
+      });
+    }
+
+    const closeBtn = document.getElementById("tv-close-btn");
+    if (closeBtn) {
+      closeBtn.addEventListener("click", () => {
+        this.closeCosmicTVModal();
+      });
+    }
+
+    const goBtn = document.getElementById("tv-go-btn");
+    const broadcastBtn = document.getElementById("tv-broadcast-btn");
+    const urlInput = document.getElementById("tv-url-input");
+
+    const submitUrl = (broadcast = true) => {
+      let raw = urlInput?.value.trim() || "";
+      if (!raw) raw = "https://en.wikipedia.org/wiki/Space_exploration";
+
+      let finalUrl = raw;
+      if (!finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
+        if (finalUrl.includes(".") && !finalUrl.includes(" ")) {
+          finalUrl = "https://" + finalUrl;
+        } else {
+          finalUrl = `https://en.wikipedia.org/w/index.php?search=${encodeURIComponent(finalUrl)}`;
+        }
+      }
+
+      let host = finalUrl;
+      try {
+        host = new URL(finalUrl).hostname;
+      } catch (e) {}
+      const title = `Web Broadcast: ${host}`;
+
+      this.loadTVChannel(finalUrl, title, broadcast);
+    };
+
+    if (goBtn) {
+      goBtn.addEventListener("click", () => submitUrl(false));
+    }
+    if (broadcastBtn) {
+      broadcastBtn.addEventListener("click", () => submitUrl(true));
+    }
+    if (urlInput) {
+      urlInput.addEventListener("keydown", (e) => {
+        if (e.code === "Enter") {
+          submitUrl(true);
+        }
+      });
+    }
+
+    // Presets
+    const presetBtns = document.querySelectorAll(".tv-preset-btn");
+    presetBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const url = btn.dataset.url;
+        const title = btn.dataset.title || url;
+        if (urlInput) urlInput.value = url;
+        this.loadTVChannel(url, title, true);
+      });
+    });
+  }
+
+  loadTVChannel(url, title = "", broadcast = false) {
+    this.currentTVUrl = url;
+    this.currentTVTitle = title || url;
+
+    const frame = document.getElementById("tv-screen-frame");
+    const statusMsg = document.getElementById("tv-status-msg");
+    const titleEl = document.getElementById("tv-active-title");
+    const urlInput = document.getElementById("tv-url-input");
+
+    if (urlInput) urlInput.value = url;
+    if (titleEl) titleEl.innerText = this.currentTVTitle;
+    if (statusMsg) statusMsg.innerText = `Tuned: ${url}`;
+
+    if (frame) {
+      const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
+      frame.src = proxyUrl;
+    }
+
+    if (broadcast && this.onTuneTV) {
+      this.onTuneTV(url, this.currentTVTitle);
+      this.addLogItem(`📡 [COSMIC TV] Broadcast tuned to: ${url}`);
+    }
+  }
+
+  toggleCosmicTVModal() {
+    if (!this.cosmicTvModal) return;
+    const isVisible = this.cosmicTvModal.style.display === "flex" || this.cosmicTvModal.style.display === "block";
+    if (isVisible) {
+      this.closeCosmicTVModal();
+    } else {
+      this.openCosmicTVModal();
+    }
+  }
+
+  openCosmicTVModal(defaultUrl = null, title = null) {
+    if (!this.cosmicTvModal) return;
+    if (document.pointerLockElement) {
+      document.exitPointerLock();
+    }
+    this.closeMorphModal();
+    this.closeStarmapModal();
+    this.closePlanetModal();
+
+    this.cosmicTvModal.style.display = "flex";
+
+    const frame = document.getElementById("tv-screen-frame");
+    const targetUrl = defaultUrl || this.currentTVUrl || "https://en.wikipedia.org/wiki/Space_exploration";
+    const targetTitle = title || this.currentTVTitle || "Wikipedia — Space Exploration";
+
+    if (!frame.src || frame.src === "about:blank" || defaultUrl) {
+      this.loadTVChannel(targetUrl, targetTitle, false);
+    }
+
+    const input = document.getElementById("tv-url-input");
+    if (input) {
+      input.value = targetUrl;
+      setTimeout(() => input.focus(), 50);
+    }
+  }
+
+  closeCosmicTVModal() {
+    if (!this.cosmicTvModal) return;
+    this.cosmicTvModal.style.display = "none";
+    if (this.isEntered) {
+      document.getElementById("webgl-canvas")?.requestPointerLock();
+    }
+  }
+
+  setTVSyncState(channelData) {
+    if (!channelData || !channelData.url) return;
+    this.currentTVUrl = channelData.url;
+    this.currentTVTitle = channelData.title || channelData.url;
+
+    const titleEl = document.getElementById("tv-active-title");
+    const statusMsg = document.getElementById("tv-status-msg");
+    const urlInput = document.getElementById("tv-url-input");
+
+    if (titleEl) titleEl.innerText = this.currentTVTitle;
+    if (statusMsg) statusMsg.innerText = `Tuned by [${channelData.tunedBy || "Pilot"}]: ${channelData.url}`;
+    if (urlInput) urlInput.value = channelData.url;
+
+    if (this.cosmicTvModal && (this.cosmicTvModal.style.display === "flex" || this.cosmicTvModal.style.display === "block")) {
+      const frame = document.getElementById("tv-screen-frame");
+      if (frame) {
+        frame.src = `/api/proxy?url=${encodeURIComponent(channelData.url)}`;
+      }
     }
   }
 

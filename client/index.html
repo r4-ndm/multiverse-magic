@@ -593,18 +593,19 @@
     #hud-action-bar {
       position: absolute;
       top: 18px;
-      left: 500px;
+      left: 540px;
       display: flex;
       gap: 10px;
       align-items: center;
       z-index: 25;
       pointer-events: auto;
+      flex-wrap: wrap;
     }
 
-    @media (max-width: 1080px) {
+    @media (max-width: 1200px) {
       #hud-action-bar {
         left: 18px;
-        top: 145px;
+        top: 155px;
       }
     }
 
@@ -893,6 +894,233 @@
       font-weight: 700;
       box-shadow: 0 0 12px rgba(0, 255, 136, 0.4);
     }
+
+    /* Cosmic Web TV Modal / In-Flight Hypertext Browser */
+    #cosmic-tv-modal {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 980px;
+      max-width: 95vw;
+      height: 82vh;
+      max-height: 860px;
+      background: radial-gradient(circle at center, #131722 0%, #080a10 100%);
+      border: 3px solid #b87333;
+      box-shadow: 0 0 60px rgba(184, 115, 51, 0.45), 0 0 120px rgba(0, 240, 255, 0.2), inset 0 0 30px rgba(0, 0, 0, 0.8);
+      border-radius: 18px;
+      z-index: 65;
+      display: none;
+      backdrop-filter: blur(20px);
+      pointer-events: auto;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 14px;
+    }
+    .tv-bezel-frame {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      width: 100%;
+      border: 1px solid rgba(255, 180, 100, 0.2);
+      border-radius: 12px;
+      padding: 10px;
+      background: rgba(4, 6, 12, 0.85);
+      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.9);
+    }
+    .tv-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(184, 115, 51, 0.3);
+      margin-bottom: 8px;
+    }
+    .tv-antenna-indicator {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 13px;
+      font-weight: 800;
+      color: #ffd700;
+      letter-spacing: 1.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tv-channel-title {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+    .tv-close-btn {
+      background: rgba(255, 0, 85, 0.15);
+      border: 1px solid var(--neon-pink);
+      color: #ff99bb;
+      font-size: 20px;
+      line-height: 1;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+    .tv-close-btn:hover {
+      background: var(--neon-pink);
+      color: #ffffff;
+      box-shadow: 0 0 12px var(--neon-pink);
+    }
+    .tv-browser-bar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .tv-url-prefix {
+      font-weight: 800;
+      font-size: 11px;
+      color: #ffd700;
+      padding: 8px 10px;
+      background: rgba(184, 115, 51, 0.15);
+      border: 1px solid rgba(184, 115, 51, 0.4);
+      border-radius: 6px;
+    }
+    .tv-url-input {
+      flex: 1;
+      background: rgba(10, 14, 26, 0.95);
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      color: #00f0ff;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+    .tv-url-input:focus {
+      border-color: #00ff88;
+      box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+    }
+    .tv-action-btn {
+      padding: 8px 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 6px;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .tv-go-btn {
+      background: linear-gradient(135deg, #00f0ff, #00ff88);
+      color: #050811;
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+    }
+    .tv-go-btn:hover {
+      box-shadow: 0 0 18px rgba(0, 255, 136, 0.7);
+      transform: translateY(-1px);
+    }
+    .tv-sync-btn {
+      background: linear-gradient(135deg, #9d00ff, #ff0055);
+      color: #ffffff;
+      box-shadow: 0 0 10px rgba(157, 0, 255, 0.3);
+    }
+    .tv-sync-btn:hover {
+      box-shadow: 0 0 18px rgba(255, 0, 85, 0.7);
+      transform: translateY(-1px);
+    }
+    .tv-presets-bar {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .tv-preset-label {
+      font-size: 10px;
+      color: #ffd700;
+      font-weight: 700;
+      margin-right: 2px;
+    }
+    .tv-preset-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #e0f2fe;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tv-preset-btn:hover {
+      background: rgba(0, 240, 255, 0.2);
+      border-color: #00f0ff;
+      color: #00f0ff;
+    }
+    .tv-crt-viewport {
+      flex: 1;
+      position: relative;
+      background: #000000;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 2px solid rgba(184, 115, 51, 0.4);
+      box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.95);
+      min-height: 350px;
+    }
+    #tv-screen-frame {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #ffffff;
+      display: block;
+    }
+    .tv-scanlines {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.22) 50%);
+      background-size: 100% 4px;
+      opacity: 0.3;
+      z-index: 2;
+    }
+    .tv-footer-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 11px;
+      color: #64748b;
+    }
+    .tv-footer-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #00ff88;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 60%;
+    }
+    .tv-blinking-led {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #00ff88;
+      box-shadow: 0 0 8px #00ff88;
+      animation: blinkLed 1.5s infinite ease-in-out;
+    }
+    @keyframes blinkLed {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
   </style>
 </head>
 <body>
@@ -951,13 +1179,14 @@
       </div>
       <div class="keybind-hint">
         WASD: Fly & Strafe | Space/C: Ascend/Descend<br/>
-        Left Click / F: Shoot | V: View | B: Build Planet | J: Starmap | H: Morph | Tab: Cursor
+        Left Click / F: Shoot | E: Cosmic TV | V: View | B: Build Planet | J: Starmap | H: Morph
       </div>
     </div>
 
     <!-- In-Game Action Buttons -->
     <div id="hud-action-bar">
       <button id="hud-camera-btn" class="hud-action-btn">🎯 1ST PERSON [V]</button>
+      <button id="hud-tv-btn" class="hud-action-btn" style="border-color:#ffd700; color:#ffd700;">📺 COSMIC TV [E]</button>
       <button id="hud-morph-btn" class="hud-action-btn">🎭 MORPH [H]</button>
       <button id="hud-build-btn" class="hud-action-btn">🪐 BUILD PLANET [B]</button>
       <button id="hud-starmap-btn" class="hud-action-btn">🚀 STARMAP [J]</button>
@@ -969,6 +1198,56 @@
 
   <!-- Hyperspace Warp Tunnel Visual FX -->
   <div id="warp-tunnel-overlay"></div>
+
+  <!-- Cosmic Web TV Modal / In-Flight Browser -->
+  <div id="cosmic-tv-modal">
+    <div class="tv-bezel-frame">
+      <div class="tv-header">
+        <div class="tv-header-left">
+          <div class="tv-antenna-indicator">📡 LIVE RETRO-COSMIC WEB TV</div>
+          <div class="tv-channel-title" id="tv-active-title">Hypertext Space Terminal</div>
+        </div>
+        <div class="tv-header-controls">
+          <button id="tv-close-btn" class="tv-close-btn" title="Exit TV (or press E / ESC)">&times;</button>
+        </div>
+      </div>
+
+      <div class="tv-browser-bar">
+        <span class="tv-url-prefix">HTTP://</span>
+        <input type="text" id="tv-url-input" class="tv-url-input" placeholder="Enter URL (e.g. en.wikipedia.org, nasa.gov, news.ycombinator.com)..." spellcheck="false" />
+        <button id="tv-go-btn" class="tv-action-btn tv-go-btn">TUNE &amp; GO</button>
+        <button id="tv-broadcast-btn" class="tv-action-btn tv-sync-btn" title="Broadcast this web channel to all pilots in the solar system">📡 BROADCAST</button>
+      </div>
+
+      <!-- Quick Preset Channels -->
+      <div class="tv-presets-bar">
+        <span class="tv-preset-label">CHANNELS:</span>
+        <button class="tv-preset-btn" data-url="https://en.wikipedia.org/wiki/Space_exploration" data-title="Wikipedia — Space Exploration">🚀 Space</button>
+        <button class="tv-preset-btn" data-url="https://en.wikipedia.org/wiki/Frog" data-title="Wikipedia — Cosmic Frog">🐸 Frog</button>
+        <button class="tv-preset-btn" data-url="https://en.wikipedia.org/wiki/Squirrel" data-title="Wikipedia — Galactic Squirrel">🐿️ Squirrel</button>
+        <button class="tv-preset-btn" data-url="https://en.wikipedia.org/wiki/Solar_System" data-title="Wikipedia — Solar System">🪐 Solar System</button>
+        <button class="tv-preset-btn" data-url="https://news.ycombinator.com" data-title="Hacker News Live">📰 Hacker News</button>
+        <button class="tv-preset-btn" data-url="https://www.w3.org/History/19921103-hypertext/hypertext/WWW/TheProject.html" data-title="First Web Page (1992)">🕹️ 1992 Web</button>
+      </div>
+
+      <!-- CRT Display with Scanlines -->
+      <div class="tv-crt-viewport">
+        <iframe id="tv-screen-frame" src="" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+        <div class="tv-scanlines"></div>
+      </div>
+
+      <!-- Status Bar -->
+      <div class="tv-footer-bar">
+        <div class="tv-footer-status">
+          <span class="tv-blinking-led"></span>
+          <span id="tv-status-msg">Tuned to: https://en.wikipedia.org/wiki/Space_exploration</span>
+        </div>
+        <div class="tv-footer-hint">
+          Press <b>[E]</b> or <b>[ESC]</b> to resume spaceflight
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Interstellar Starmap Modal -->
   <div id="starmap-modal">
