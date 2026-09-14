@@ -1,10 +1,14 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { characterRegistry } from "../characters/index.js";
+import { mountCharacter } from "../characters/present.js";
+import { createPixelCard } from "../characters/pixelCard.js";
+import { isImageAvatar } from "../ui/portrait.js";
+import { BLOCK_SIZE } from "./BuildBlock.js";
 
 /**
  * PlayerSystem manages the local player's controls, space flight physics (with inertia),
- * third-person chase camera, avatar loading, and remote player mesh management.
+ * first-person camera, avatar loading, and remote player mesh management.
  */
 export class PlayerSystem {
   constructor(scene, camera) {
@@ -23,6 +27,7 @@ export class PlayerSystem {
     // Movement & physics settings
     this.thrustForce = 45.0;
     this.maxSpeed = 65.0;
+    this.deepCruise = 32.0;
     this.drag = 0.975; // Space inertia damping
     this.mouseSensitivity = 0.0022;
 
@@ -37,20 +42,25 @@ export class PlayerSystem {
       boost: false,
     };
 
-    // Camera modes: 'fps' (First-Person Shooter) or 'third' (Third-Person Over-the-Shoulder)
-    // Default to First-Person Shooter mode for completely unobstructed view and clean laser combat
+    // First person only. Local mesh stays hidden so it never blocks the view.
     this.cameraMode = "fps";
-    try {
-      const savedMode = localStorage.getItem("camera_mode");
-      if (savedMode === "fps" || savedMode === "third") {
-        this.cameraMode = savedMode;
-      }
-    } catch (_) {}
 
-    this.cameraDistance = 7.5;
-    this.cameraOffset = new THREE.Vector3(1.5, 2.5, 7.5);
-    this.cameraLookOffset = new THREE.Vector3(0.35, 1.3, -16.0);
-    this.currentCameraPos = new THREE.Vector3();
+    // Gravity drops you onto container roofs so you can walk them. Off = space flight.
+    this.gravityOn = false;
+    this.grounded = false;
+    this.jumpCooldown = 0;
+    this.walkTime = 0;
+    this.worldSystem = null;
+    this.onGravityChange = null;
+    this.playerRadius = 0.55;
+    this.playerHeight = 1.8;
+    this.walkSpeed = 16;
+    this.gravityAccel = 36;
+    this.jumpSpeed = 11;
+    this.floorY = null;
+    this.eyeBob = 0;
+    this.drivingCar = null;
+    this.vehicleSystem = null;
 
     // Remote players registry: sessionId -> { mesh, targetPos, targetRot, healthSprite, trail }
     this.remotePlayers = new Map();
@@ -82,44 +92,15 @@ export class PlayerSystem {
     this.localNametag.position.set(0, 3.4, 0);
     this.mesh.add(this.localNametag);
 
-    // Apply initial camera mode (hides mesh & nametag locally in FPS mode)
-    this.setCameraMode(this.cameraMode);
+    this.hideLocalBody();
 
     // Setup input listeners
     this.setupInputs();
   }
 
-  setCameraMode(mode) {
-    this.cameraMode = mode === "third" ? "third" : "fps";
-    try {
-      localStorage.setItem("camera_mode", this.cameraMode);
-    } catch (_) {}
-
-    const isThird = this.cameraMode === "third";
-    if (this.mesh) {
-      this.mesh.visible = isThird;
-    }
-    if (this.localNametag) {
-      this.localNametag.visible = isThird;
-    }
-
-    // Update HUD button text if present
-    const btn = document.getElementById("hud-camera-btn");
-    if (btn) {
-      btn.innerText = isThird ? "📷 3RD PERSON [V]" : "🎯 1ST PERSON [V]";
-      btn.title = isThird ? "Switch to First-Person Mode (V)" : "Switch to Third-Person View (V)";
-    }
-
-    // If switching to third person, snap camera immediately
-    if (isThird) {
-      const targetCamOffset = this.cameraOffset.clone().applyQuaternion(this.quaternion);
-      this.camera.position.copy(this.position.clone().add(targetCamOffset));
-    }
-    return this.cameraMode;
-  }
-
-  toggleCameraMode() {
-    return this.setCameraMode(this.cameraMode === "fps" ? "third" : "fps");
+  hideLocalBody() {
+    if (this.mesh) this.mesh.visible = false;
+    if (this.localNametag) this.localNametag.visible = false;
   }
 
   setLocalCharacter(type = "astronaut", color = "#00f0ff", avatarUrl = "") {
@@ -128,12 +109,15 @@ export class PlayerSystem {
     this.characterColor = colorHex;
 
     if (avatarUrl && avatarUrl.trim()) {
+      const url = avatarUrl.trim();
+      if (isImageAvatar(url)) {
+        this.swapMesh(createPixelCard(THREE, url));
+        return;
+      }
       this.gltfLoader.load(
-        avatarUrl.trim(),
+        url,
         (gltf) => {
-          const model = gltf.scene;
-          model.scale.set(1.5, 1.5, 1.5);
-          this.swapMesh(model);
+          this.swapMesh(mountCharacter(THREE, gltf));
         },
         undefined,
         (err) => {
@@ -162,12 +146,12 @@ export class PlayerSystem {
     this.mesh = newMesh;
     this.mesh.position.copy(pos);
     this.mesh.quaternion.copy(quat);
-    this.mesh.visible = this.cameraMode === "third";
+    this.hideLocalBody();
 
     // Re-attach nametag
     if (this.localNametag) {
       this.localNametag.position.set(0, 3.4, 0);
-      this.localNametag.visible = this.cameraMode === "third";
+      this.localNametag.visible = false;
       this.mesh.add(this.localNametag);
     }
 
@@ -781,7 +765,7 @@ export class PlayerSystem {
         case "KeyS": this.keys.backward = true; break;
         case "KeyA": this.keys.left = true; break;
         case "KeyD": this.keys.right = true; break;
-        case "Space": this.keys.up = true; break;
+        case "KeyQ": this.keys.up = true; break;
         case "KeyC":
         case "ShiftLeft":
         case "ShiftRight": this.keys.down = true; break;
@@ -794,7 +778,7 @@ export class PlayerSystem {
         case "KeyS": this.keys.backward = false; break;
         case "KeyA": this.keys.left = false; break;
         case "KeyD": this.keys.right = false; break;
-        case "Space": this.keys.up = false; break;
+        case "KeyQ": this.keys.up = false; break;
         case "KeyC":
         case "ShiftLeft":
         case "ShiftRight": this.keys.down = false; break;
@@ -835,58 +819,73 @@ export class PlayerSystem {
       const movementX = e.movementX || 0;
       const movementY = e.movementY || 0;
 
-      this.euler.y -= movementX * this.mouseSensitivity;
-      this.euler.x -= movementY * this.mouseSensitivity;
-
-      // Clamp vertical pitch to prevent gimbal flip
-      this.euler.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.euler.x));
+      if (this.drivingCar) {
+        // Mouse looks around the cabin; A/D steers the car.
+        this.vehicleSystem?.addLook?.(
+          movementX * this.mouseSensitivity,
+          movementY * this.mouseSensitivity
+        );
+        this.euler.x = 0;
+      } else {
+        this.euler.y -= movementX * this.mouseSensitivity;
+        this.euler.x -= movementY * this.mouseSensitivity;
+        this.euler.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.euler.x));
+      }
 
       this.quaternion.setFromEuler(this.euler);
     });
 
-    // KeyV toggles between First-Person (FPS) and Third-Person (Over-the-shoulder)
-    window.addEventListener("keydown", (e) => {
-      if (e.code === "KeyV" && !e.repeat) {
-        if (document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
-          this.toggleCameraMode();
-        }
-      }
-    });
+  }
 
-    // Mouse wheel zoom to adjust camera distance dynamically & blend into FPS
-    window.addEventListener(
-      "wheel",
-      (e) => {
-        if (!this.isPointerLocked) return;
-        if (this.cameraMode === "fps") {
-          // If in FPS mode and zooming out, seamlessly enter 3rd person mode
-          if (e.deltaY > 0) {
-            this.setCameraMode("third");
-          }
-          return;
-        }
+  toggleGravity() {
+    this.setGravity(!this.gravityOn);
+    return this.gravityOn;
+  }
 
-        // If in 3rd person and zooming all the way in, seamlessly enter FPS mode
-        if (e.deltaY < 0 && this.cameraDistance <= 4.6) {
-          this.setCameraMode("fps");
-          return;
-        }
-
-        this.cameraDistance = Math.max(4.5, Math.min(11.5, this.cameraDistance + (e.deltaY > 0 ? 0.6 : -0.6)));
-        const scale = this.cameraDistance / 7.5;
-        this.cameraOffset.set(1.5 * scale, 2.5 * scale, this.cameraDistance);
-      },
-      { passive: true }
-    );
+  setGravity(on) {
+    if (!on && this.drivingCar) this.vehicleSystem?.exitCar(true);
+    this.gravityOn = !!on;
+    this.grounded = false;
+    this.jumpCooldown = 0;
+    this.floorY = null;
+    this.eyeBob = 0;
+    this.walkTime = 0;
+    this.velocity.set(0, 0, 0);
+    if (this.gravityOn) this.placeOnContainer();
+    this.onGravityChange?.(this.gravityOn);
   }
 
   /**
-   * Updates local ship movement, inertia, and third-person camera.
+   * Updates local flight, inertia, and the first-person camera.
    */
   update(delta) {
     if (!this.mesh) return;
+    this._lastDelta = delta;
 
-    // Calculate acceleration direction in local ship space
+    if (this.drivingCar) {
+      this.vehicleSystem?.update(delta);
+    } else if (this.gravityOn) {
+      this.updateWalk(delta);
+    } else {
+      this.updateFlight(delta);
+    }
+
+    // When pinned to a car, the vehicle owns the avatar transform.
+    if (!(this.drivingCar && this.mesh.userData.pinnedToCar)) {
+      this.mesh.position.copy(this.position);
+      if (this.gravityOn) {
+        this.mesh.quaternion.setFromEuler(new THREE.Euler(0, this.euler.y, 0, "YXZ"));
+      } else {
+        this.mesh.quaternion.copy(this.quaternion);
+      }
+    }
+    this.mesh.userData.animate?.(delta, this.camera);
+
+    this.updateCamera();
+    this.updateRemotePlayers(delta);
+  }
+
+  updateFlight(delta) {
     const moveDir = new THREE.Vector3();
     if (this.keys.forward) moveDir.z -= 1;
     if (this.keys.backward) moveDir.z += 1;
@@ -897,62 +896,341 @@ export class PlayerSystem {
 
     if (moveDir.lengthSq() > 0) {
       moveDir.normalize();
-      // Rotate input direction by current ship orientation
       moveDir.applyQuaternion(this.quaternion);
-
-      // Apply thrust acceleration
       this.velocity.addScaledVector(moveDir, this.thrustForce * delta);
     }
 
-    // Clamp to max speed
-    if (this.velocity.length() > this.maxSpeed) {
-      this.velocity.setLength(this.maxSpeed);
+    const far = this.position.length() > 600;
+    const limit = far ? Math.min(this.maxSpeed, this.deepCruise) : this.maxSpeed;
+    this.returnSpeed = limit;
+    if (this.velocity.length() > limit) {
+      this.velocity.setLength(limit);
     }
 
-    // Apply space friction/inertia damping
     this.velocity.multiplyScalar(Math.pow(this.drag, delta * 60));
-
-    // Update position
-    this.position.addScaledVector(this.velocity, delta);
-
-    // Apply orientation and position to mesh
-    this.mesh.position.copy(this.position);
-    this.mesh.quaternion.copy(this.quaternion);
-
-    // Smoothly update third-person or first-person camera
-    this.updateCamera(delta);
-
-    // Update remote players interpolation
-    this.updateRemotePlayers(delta);
+    this.slideAgainstContainers(delta);
   }
 
-  updateCamera(delta) {
-    if (this.cameraMode === "fps") {
-      // First-Person Shooter Mode: camera placed at eye level with 0 obstruction
-      const eyeOffset = new THREE.Vector3(0, 1.45, 0).applyQuaternion(this.quaternion);
-      const eyePos = this.position.clone().add(eyeOffset);
-      this.camera.position.copy(eyePos);
+  updateWalk(delta) {
+    this.jumpCooldown = Math.max(0, this.jumpCooldown - delta);
+    const forward = this.walkForward();
+    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0));
+    const wish = new THREE.Vector3();
+    if (this.keys.forward) wish.add(forward);
+    if (this.keys.backward) wish.sub(forward);
+    if (this.keys.right) wish.add(right);
+    if (this.keys.left) wish.sub(right);
 
-      // Camera looks directly forward along orientation
-      const lookTarget = eyePos.clone().add(
-        new THREE.Vector3(0, 0, -20.0).applyQuaternion(this.quaternion)
-      );
-      this.camera.lookAt(lookTarget);
+    const moving = wish.lengthSq() > 0;
+    if (moving) wish.normalize();
+    this.velocity.x = wish.x * this.walkSpeed;
+    this.velocity.z = wish.z * this.walkSpeed;
+
+    if (this.keys.up && this.grounded && this.jumpCooldown <= 0) {
+      this.velocity.y = this.jumpSpeed;
+      this.grounded = false;
+      this.floorY = null;
+      this.jumpCooldown = 0.32;
+    } else if (!this.grounded) {
+      this.velocity.y -= this.gravityAccel * delta;
+      if (this.velocity.y < -48) this.velocity.y = -48;
     } else {
-      // Third-Person Over-the-Shoulder Mode
-      const targetCamOffset = this.cameraOffset.clone().applyQuaternion(this.quaternion);
-      const targetCamPos = this.position.clone().add(targetCamOffset);
-
-      // Smooth, frame-rate independent camera chase
-      const lerpFactor = 1.0 - Math.exp(-14.0 * delta);
-      this.camera.position.lerp(targetCamPos, lerpFactor);
-
-      // Camera look-at target slightly in front of the avatar
-      const lookTarget = this.position.clone().add(
-        this.cameraLookOffset.clone().applyQuaternion(this.quaternion)
-      );
-      this.camera.lookAt(lookTarget);
+      this.velocity.y = 0;
     }
+
+    if (moving && this.grounded) this.walkTime += delta * 8;
+    else this.walkTime *= Math.max(0, 1 - delta * 10);
+
+    this.walkAgainstContainers(delta);
+    this.returnSpeed = this.walkSpeed;
+  }
+
+  walkForward() {
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.quaternion);
+    forward.y = 0;
+    if (forward.lengthSq() < 0.04) {
+      forward.set(-Math.sin(this.euler.y), 0, -Math.cos(this.euler.y));
+    }
+    return forward.normalize();
+  }
+
+  walkAgainstContainers(delta) {
+    const boxes = this.nearbyContainers(5 + this.velocity.length() * delta);
+    const radius = this.playerRadius;
+    const height = this.playerHeight;
+    const skin = 0.02;
+
+    this.position.x += this.velocity.x * delta;
+    this.resolveWalkAxis("x", boxes, radius, height, skin);
+    this.position.z += this.velocity.z * delta;
+    this.resolveWalkAxis("z", boxes, radius, height, skin);
+
+    if (!this.grounded) {
+      this.position.y += this.velocity.y * delta;
+      this.resolveWalkCeiling(boxes, radius, height, skin);
+    }
+
+    this.snapToWalkFloor(boxes, radius, skin);
+  }
+
+  walkBodyOverlaps(box, radius, height) {
+    const feet = this.position.y;
+    const head = feet + height;
+    // Standing on the roof is not a wall hit.
+    if (feet >= box.maxY - 0.08) return false;
+    return (
+      this.position.x + radius > box.minX &&
+      this.position.x - radius < box.maxX &&
+      this.position.z + radius > box.minZ &&
+      this.position.z - radius < box.maxZ &&
+      head > box.minY + 0.02 &&
+      feet < box.maxY - 0.02
+    );
+  }
+
+  resolveWalkAxis(axis, boxes, radius, height, skin) {
+    for (const box of boxes) {
+      if (!this.walkBodyOverlaps(box, radius, height)) continue;
+      const min = axis === "x" ? box.minX : box.minZ;
+      const max = axis === "x" ? box.maxX : box.maxZ;
+      const pos = this.position[axis];
+      const pushPos = max + radius + skin - pos;
+      const pushNeg = min - radius - skin - pos;
+      this.position[axis] += Math.abs(pushPos) < Math.abs(pushNeg) ? pushPos : pushNeg;
+      this.velocity[axis] = 0;
+    }
+  }
+
+  resolveWalkCeiling(boxes, radius, height, skin) {
+    const head = this.position.y + height;
+    for (const box of boxes) {
+      if (!this.overBox(box, radius * 0.35)) continue;
+      if (this.position.y >= box.minY) continue;
+      if (head > box.minY - skin) {
+        this.position.y = box.minY - height - skin;
+        if (this.velocity.y > 0) this.velocity.y = 0;
+      }
+    }
+  }
+
+  snapToWalkFloor(boxes, radius, skin) {
+    const rising = !this.grounded && this.velocity.y > 0.4;
+    const stepUp = rising ? 0.12 : 0.45;
+    const stepDown = rising ? -0.01 : (this.grounded ? 0.55 : Math.max(0.2, -this.velocity.y * 0.05 + 0.15));
+    let floor = null;
+    for (const box of boxes) {
+      if (!this.overBox(box, radius * 0.15)) continue;
+      const gap = this.position.y - box.maxY;
+      // Keep contact if you are on the roof, or have only sunk a little into it.
+      if (gap > stepDown || gap < -stepUp) continue;
+      if (!floor || box.maxY > floor) floor = box.maxY;
+    }
+
+    if (floor == null) {
+      this.grounded = false;
+      this.floorY = null;
+      return;
+    }
+
+    this.position.y = floor + skin;
+    this.velocity.y = 0;
+    this.grounded = true;
+    this.floorY = floor;
+  }
+
+  containerBoxes() {
+    const boxes = [];
+    const objects = this.worldSystem?.objects;
+    if (!objects) return boxes;
+    const hx = BLOCK_SIZE.x / 2;
+    const hy = BLOCK_SIZE.y / 2;
+    const hz = BLOCK_SIZE.z / 2;
+    objects.forEach((obj) => {
+      if (!obj.isBuildBlock || !obj.mesh) return;
+      const p = obj.mesh.position;
+      boxes.push({
+        minX: p.x - hx,
+        maxX: p.x + hx,
+        minY: p.y - hy,
+        maxY: p.y + hy,
+        minZ: p.z - hz,
+        maxZ: p.z + hz,
+      });
+    });
+    return boxes;
+  }
+
+  overBox(box, inset) {
+    return (
+      this.position.x + inset > box.minX &&
+      this.position.x - inset < box.maxX &&
+      this.position.z + inset > box.minZ &&
+      this.position.z - inset < box.maxZ
+    );
+  }
+
+  collisionSpheres() {
+    const spheres = [
+      { y: 0.62, r: 0.62 },
+      { y: 1.15, r: 0.58 },
+      { y: 1.72, r: 0.5 },
+    ];
+    if (!this.gravityOn) {
+      const eye = new THREE.Vector3(0, 1.45, 0).applyQuaternion(this.quaternion);
+      spheres.push({ y: eye.y, x: eye.x, z: eye.z, r: 0.4 });
+    }
+    return spheres;
+  }
+
+  spherePush(center, radius, box) {
+    const cx = Math.max(box.minX, Math.min(box.maxX, center.x));
+    const cy = Math.max(box.minY, Math.min(box.maxY, center.y));
+    const cz = Math.max(box.minZ, Math.min(box.maxZ, center.z));
+    let dx = center.x - cx;
+    let dy = center.y - cy;
+    let dz = center.z - cz;
+    const distSq = dx * dx + dy * dy + dz * dz;
+    const skin = 0.06;
+    if (distSq > 1e-8) {
+      if (distSq >= radius * radius) return null;
+      const dist = Math.sqrt(distSq);
+      const scale = (radius + skin - dist) / dist;
+      return new THREE.Vector3(dx * scale, dy * scale, dz * scale);
+    }
+
+    // Center is inside the container. Leave through the nearest face, including the underside.
+    const faces = [
+      { d: center.x - box.minX, x: -1, y: 0, z: 0 },
+      { d: box.maxX - center.x, x: 1, y: 0, z: 0 },
+      { d: center.y - box.minY, x: 0, y: -1, z: 0 },
+      { d: box.maxY - center.y, x: 0, y: 1, z: 0 },
+      { d: center.z - box.minZ, x: 0, y: 0, z: -1 },
+      { d: box.maxZ - center.z, x: 0, y: 0, z: 1 },
+    ];
+    faces.sort((a, b) => a.d - b.d);
+    const face = faces[0];
+    const out = face.d + radius + skin;
+    return new THREE.Vector3(face.x * out, face.y * out, face.z * out);
+  }
+
+  deflectFromSurface(push) {
+    const len = push.length();
+    if (len < 1e-8) return;
+    const nx = push.x / len;
+    const ny = push.y / len;
+    const nz = push.z / len;
+    const into = this.velocity.x * nx + this.velocity.y * ny + this.velocity.z * nz;
+    if (into < 0) {
+      this.velocity.x -= nx * into;
+      this.velocity.y -= ny * into;
+      this.velocity.z -= nz * into;
+    }
+    if (this.gravityOn && ny > 0.55 && this.velocity.y <= 0.5) {
+      this.grounded = true;
+      if (this.velocity.y < 0) this.velocity.y = 0;
+    }
+  }
+
+  pushOutOfContainers(boxes) {
+    const spheres = this.collisionSpheres();
+    for (let pass = 0; pass < 4; pass++) {
+      let moved = false;
+      for (const sphere of spheres) {
+        const center = new THREE.Vector3(
+          this.position.x + (sphere.x || 0),
+          this.position.y + sphere.y,
+          this.position.z + (sphere.z || 0)
+        );
+        for (const box of boxes) {
+          const push = this.spherePush(center, sphere.r, box);
+          if (!push) continue;
+          this.position.add(push);
+          center.add(push);
+          this.deflectFromSurface(push);
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
+  }
+
+  nearbyContainers(reach) {
+    const boxes = this.containerBoxes();
+    const x = this.position.x;
+    const y = this.position.y;
+    const z = this.position.z;
+    return boxes.filter((box) => (
+      x + reach > box.minX &&
+      x - reach < box.maxX &&
+      y + reach + 2.4 > box.minY &&
+      y - reach < box.maxY &&
+      z + reach > box.minZ &&
+      z - reach < box.maxZ
+    ));
+  }
+
+  slideAgainstContainers(delta) {
+    const reach = 4 + this.velocity.length() * delta;
+    const boxes = this.nearbyContainers(reach);
+    if (!boxes.length) {
+      this.position.addScaledVector(this.velocity, delta);
+      return;
+    }
+
+    this.pushOutOfContainers(boxes);
+    const motion = this.velocity.clone().multiplyScalar(delta);
+    const steps = Math.max(1, Math.ceil(motion.length() / 0.2));
+    motion.multiplyScalar(1 / steps);
+    for (let i = 0; i < steps; i++) {
+      this.position.add(motion);
+      this.pushOutOfContainers(boxes);
+    }
+  }
+
+  placeOnContainer() {
+    const boxes = this.containerBoxes();
+    let roof = null;
+    for (const box of boxes) {
+      if (!this.overBox(box, 0.2)) continue;
+      const gap = this.position.y - box.maxY;
+      const inside = gap < 0 && gap > -BLOCK_SIZE.y;
+      const closeAbove = gap >= -0.2 && gap <= 14;
+      if (!inside && !closeAbove) continue;
+      if (!roof || box.maxY > roof.maxY) roof = box;
+    }
+    if (!roof) return;
+    this.position.y = roof.maxY + 0.02;
+    this.grounded = true;
+    this.floorY = roof.maxY;
+    this.velocity.set(0, 0, 0);
+  }
+
+  updateCamera() {
+    if (this.drivingCar) {
+      const delta = Math.min(0.05, this._lastDelta || 0.016);
+      this.vehicleSystem?.updateDriveCamera(this.camera, this, delta);
+      return;
+    }
+
+    const targetBob = this.gravityOn && this.grounded && this.walkTime > 0.2
+      ? Math.sin(this.walkTime) * 0.018
+      : 0;
+    this.eyeBob += (targetBob - this.eyeBob) * 0.2;
+
+    let eyePos;
+    if (this.gravityOn) {
+      eyePos = this.position.clone();
+      eyePos.y += 1.45 + this.eyeBob;
+    } else {
+      const eyeOffset = new THREE.Vector3(0, 1.45, 0).applyQuaternion(this.quaternion);
+      eyePos = this.position.clone().add(eyeOffset);
+    }
+    this.camera.position.copy(eyePos);
+
+    const lookTarget = eyePos.clone().add(
+      new THREE.Vector3(0, 0, -20.0).applyQuaternion(this.quaternion)
+    );
+    this.camera.lookAt(lookTarget);
   }
 
   parseColor(color, defaultColor = 0x00f0ff) {
@@ -1000,10 +1278,12 @@ export class PlayerSystem {
         health: data.health || 100,
         name: pilotName,
         nametagSprite,
+        driving: !!data.driving,
       };
 
       mesh.position.copy(remote.targetPos);
       this.remotePlayers.set(sessionId, remote);
+      if (remote.driving) this.vehicleSystem?.syncRemoteDriver(sessionId, remote, true);
 
       // If custom GLB model URL was provided, attempt asynchronous load
       if (avatarUrl && avatarUrl.trim()) {
@@ -1034,6 +1314,11 @@ export class PlayerSystem {
 
       if (nameChanged || healthChanged) {
         this.updateNametagSprite(remote.nametagSprite, remote.name, remote.health);
+      }
+
+      if (typeof data.driving === "boolean" && data.driving !== remote.driving) {
+        remote.driving = data.driving;
+        this.vehicleSystem?.syncRemoteDriver(sessionId, remote, remote.driving);
       }
     }
   }
@@ -1075,36 +1360,35 @@ export class PlayerSystem {
   }
 
   loadRemoteCustomAvatar(sessionId, avatarUrl) {
+    const apply = (model) => {
+      const remote = this.remotePlayers.get(sessionId);
+      if (!remote) return;
+      model.userData.playerId = sessionId;
+      const currentPos = remote.mesh.position.clone();
+      const currentQuat = remote.mesh.quaternion.clone();
+      const preservedChildren = [];
+      remote.mesh.traverse((child) => {
+        if (child === remote.nametagSprite || child.isPositionalAudio) {
+          preservedChildren.push(child);
+        }
+      });
+      preservedChildren.forEach((child) => remote.mesh.remove(child));
+      this.scene.remove(remote.mesh);
+      model.position.copy(currentPos);
+      model.quaternion.copy(currentQuat);
+      preservedChildren.forEach((child) => model.add(child));
+      this.scene.add(model);
+      remote.mesh = model;
+    };
+
+    if (isImageAvatar(avatarUrl)) {
+      apply(createPixelCard(THREE, avatarUrl));
+      return;
+    }
+
     this.gltfLoader.load(
       avatarUrl,
-      (gltf) => {
-        const remote = this.remotePlayers.get(sessionId);
-        if (!remote) return;
-
-        const model = gltf.scene;
-        model.scale.set(1.5, 1.5, 1.5);
-        model.userData.playerId = sessionId;
-
-        const currentPos = remote.mesh.position.clone();
-        const currentQuat = remote.mesh.quaternion.clone();
-
-        // Transfer children
-        const preservedChildren = [];
-        remote.mesh.traverse((child) => {
-          if (child === remote.nametagSprite || child.isPositionalAudio) {
-            preservedChildren.push(child);
-          }
-        });
-        preservedChildren.forEach((child) => remote.mesh.remove(child));
-
-        this.scene.remove(remote.mesh);
-        model.position.copy(currentPos);
-        model.quaternion.copy(currentQuat);
-        preservedChildren.forEach((child) => model.add(child));
-
-        this.scene.add(model);
-        remote.mesh = model;
-      },
+      (gltf) => apply(mountCharacter(THREE, gltf)),
       undefined,
       (err) => {
         console.warn(`[PlayerSystem] Failed loading custom avatar for remote ${sessionId}:`, err);
@@ -1115,6 +1399,11 @@ export class PlayerSystem {
   removeRemotePlayer(sessionId) {
     const remote = this.remotePlayers.get(sessionId);
     if (remote) {
+      if (remote.driveMesh) {
+        this.scene.remove(remote.driveMesh);
+        remote.driveMesh = null;
+      }
+      this.vehicleSystem?.syncRemoteDriver(sessionId, remote, false);
       this.scene.remove(remote.mesh);
       this.remotePlayers.delete(sessionId);
     }
@@ -1123,13 +1412,23 @@ export class PlayerSystem {
   updateRemotePlayers(delta) {
     const lerpFactor = Math.min(1.0, delta * 12.0);
     this.remotePlayers.forEach((remote) => {
+      if (remote.driving && remote.driveMesh?.visible) {
+        remote.driveMesh.position.lerp(remote.targetPos, lerpFactor);
+        const yaw = remote.targetRot || 0;
+        remote.driveMesh.rotation.y += (yaw - remote.driveMesh.rotation.y) * lerpFactor;
+        remote.mesh.userData.animate?.(delta, this.camera);
+        this.vehicleSystem?.updateRemoteCar(remote);
+        return;
+      }
+
       remote.mesh.position.lerp(remote.targetPos, lerpFactor);
 
-      // Interpolate rotation
       const targetQuat = new THREE.Quaternion().setFromEuler(
         new THREE.Euler(remote.targetPitch || 0, remote.targetRot || 0, 0, "YXZ")
       );
       remote.mesh.quaternion.slerp(targetQuat, lerpFactor);
+      remote.mesh.userData.animate?.(delta, this.camera);
+      this.vehicleSystem?.updateRemoteCar(remote);
     });
   }
 
@@ -1222,7 +1521,9 @@ export class PlayerSystem {
   teleport(x, y, z) {
     this.position.set(x, y, z);
     this.velocity.set(0, 0, 0);
-    if (this.mesh) this.mesh.position.set(x, y, z);
-    this.camera.position.set(x, y + 3.5, z + 9.0);
+    this.grounded = false;
+    if (this.gravityOn) this.placeOnContainer();
+    if (this.mesh) this.mesh.position.copy(this.position);
+    this.camera.position.set(this.position.x, this.position.y + 3.5, this.position.z + 9.0);
   }
 }

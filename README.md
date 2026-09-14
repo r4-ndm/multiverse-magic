@@ -3,7 +3,9 @@
 > **A Permissionless 3D Proximity Chat Universe**  
 > *"Click a URL → Grant mic → You're in."*
 
-Multiverse Magic is a browser-based, open-source 3D universe where anyone can join via a URL and immediately interact with others based on true 3D spatial voice proximity. No accounts, no passwords, no gatekeepers. The URL is the room. 
+Multiverse Magic is a browser-based, open-source 3D universe where anyone can join via a URL and immediately interact with others based on true 3D spatial voice proximity. No accounts, no passwords, no gatekeepers. The URL is the room.
+
+**Play:** [https://multiverse-magic.fly.dev/](https://multiverse-magic.fly.dev/) 
 
 Self-governing communities maintain order through in-game mechanics: trolls and bad actors can be shot, and upon sustaining critical damage, they are automatically **ejected into deep space** where their audio naturally cuts out and they must fly back manually.
 
@@ -84,13 +86,9 @@ openspace/
 Multiverse Magic is designed for autonomous coding agents (Antigravity, Cursor, Claude Code, Devin, etc.).
 
 If your agent cloned this repo, you can simply tell your agent:
-> *"Agent, launch Multiverse Magic and put me in the chat."*
+> *"Agent, put me in the chat."*
 
-The agent only needs to run:
-```bash
-npm install && npm run join
-```
-This automatically starts the backend server, Vite client, and opens your browser directly into the universe cockpit!
+Open [https://multiverse-magic.fly.dev/](https://multiverse-magic.fly.dev/). That is the live universe. No local server.
 
 See **[`AGENT.md`](./AGENT.md)** for full machine-readable directives and headless bot instructions.
 
@@ -98,27 +96,11 @@ See **[`AGENT.md`](./AGENT.md)** for full machine-readable directives and headle
 
 ## ⚡ Getting Started
 
-### Prerequisites
-- Node.js v18+ (tested on Node.js v22)
-- npm v9+
+Open [https://multiverse-magic.fly.dev/](https://multiverse-magic.fly.dev/). Click enter, allow the microphone, and you're in Open Space.
 
-### 1. Installation
-```bash
-cd openspace
-npm install
-```
-
-### 2. Run Development Server
-```bash
-npm run dev
-```
-This runs both the Colyseus server and Vite dev server concurrently:
-- **Client:** `http://localhost:3000`
-- **Server:** `ws://localhost:2567` (WebSocket) and `http://localhost:2567` (HTTP)
-
-### 3. Testing Multiplayer Proximity Voice
-1. Open `http://localhost:3000` in **Window 1**.
-2. Open `http://localhost:3000` in a **separate window or Incognito tab**.
+### Testing Multiplayer Proximity Voice
+1. Open [https://multiverse-magic.fly.dev/](https://multiverse-magic.fly.dev/) in **Window 1**.
+2. Open [https://multiverse-magic.fly.dev/](https://multiverse-magic.fly.dev/) in a **separate window or Incognito tab**.
 3. Click **"CLICK TO ENTER SPACE"** in both windows and allow microphone permissions.
 4. Fly the two ships close together (within 50 units). You will hear proximity voice chat in full 3D stereo!
 5. Fly away from each other: voice audio smoothly attenuates and disconnects once beyond 50 units.

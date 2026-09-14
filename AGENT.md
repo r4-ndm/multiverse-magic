@@ -8,31 +8,16 @@
 ## ⚡ Task 1: "Put me in the chat / universe"
 If the user asks you to put them into the 3D proximity chat universe:
 
-```bash
-# 1. Install dependencies (if first time)
-npm install
+Open [https://multiverse-magic.fly.dev/](https://multiverse-magic.fly.dev/). That is the live universe. Do not start a local server.
 
-# 2. Automatically launch server, client, and open user's cockpit browser
-npm run join
-```
-
-This script:
-- Verifies if the backend server is running; starts it if not.
-- Opens the user's default browser (Brave, Chrome, Firefox, etc.) directly to `http://localhost:3000`.
-- The user only needs to click **"CLICK TO ENTER SPACE"** and allow their microphone.
+The user only needs to click **"CLICK TO ENTER SPACE"** and allow their microphone.
 
 ---
 
 ## ⚡ Task 2: "Join someone else's space / room"
 If the user provides a remote URL or custom room name:
 
-```bash
-# Join a remote universe host
-npm run join -- https://custom-space-tunnel.loca.lt
-
-# Or open a specific named sector
-npm run join -- "http://localhost:3000?room=sector-omega"
-```
+Open [https://multiverse-magic.fly.dev/](https://multiverse-magic.fly.dev/). A named sector is the same site with `?room=`, for example [https://multiverse-magic.fly.dev/?room=sector-omega](https://multiverse-magic.fly.dev/?room=sector-omega).
 
 ---
 

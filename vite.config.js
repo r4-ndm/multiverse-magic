@@ -10,6 +10,10 @@ export default defineConfig({
     port: 3000,
     host: "0.0.0.0",
     cors: true,
+    proxy: {
+      "/api": "http://127.0.0.1:2567",
+      "/avatars": "http://127.0.0.1:2567",
+    },
   },
   build: {
     outDir: resolve(__dirname, "dist"),

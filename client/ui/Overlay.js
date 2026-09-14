@@ -1,4 +1,6 @@
+import * as THREE from "three";
 import { characterRegistry } from "../characters/index.js";
+import { fileToPortrait, uploadPortrait } from "./portrait.js";
 
 /**
  * Overlay manages user interface modals, HUD updates, event log entries,
@@ -13,6 +15,14 @@ export class Overlay {
     this.eventLog = document.getElementById("event-log");
     this.ejectionBanner = document.getElementById("ejection-banner");
     this.ejectionDistance = document.getElementById("ejection-distance");
+    this.returnCompass = document.getElementById("return-compass");
+    this.returnArrow = document.getElementById("return-arrow");
+    this.returnHeading = document.getElementById("return-heading");
+    this.returnMeta = document.getElementById("return-meta");
+    this.returnPip = document.getElementById("return-pip");
+    this.stranded = false;
+    this.ejectionTimer = null;
+    this._home = new THREE.Vector3();
     this.coordsEl = document.getElementById("hud-coords");
     this.playerIdEl = document.getElementById("hud-player-id");
     this.statusDot = document.getElementById("status-dot");
@@ -34,19 +44,29 @@ export class Overlay {
 
     this.morphModal = document.getElementById("morph-modal");
     this.hudMorphBtn = document.getElementById("hud-morph-btn");
-    this.hudCameraBtn = document.getElementById("hud-camera-btn");
     this.hudStarmapBtn = document.getElementById("hud-starmap-btn");
     this.hudBuildBtn = document.getElementById("hud-build-btn");
-    this.hudTvBtn = document.getElementById("hud-tv-btn");
+    this.hudGravityBtn = document.getElementById("hud-gravity-btn");
+    this.hudDriveBtn = document.getElementById("hud-drive-btn");
+    this.speedoEl = document.getElementById("hud-speedo");
+    this.speedoValueEl = document.getElementById("hud-speedo-value");
+    this.hudLinkBtn = document.getElementById("hud-link-btn");
+    this.hudMeetBtn = document.getElementById("hud-meet-btn");
+    this.meetingModal = document.getElementById("meeting-modal");
     this.starmapModal = document.getElementById("starmap-modal");
     this.planetModal = document.getElementById("planet-modal");
-    this.cosmicTvModal = document.getElementById("cosmic-tv-modal");
+    this.linkGunModal = document.getElementById("link-gun-modal");
     this.onCameraToggle = null;
     this.hyperlaneGate = null;
     this.onBuildPlanetCallback = null;
-    this.onTuneTV = null;
-    this.currentTVUrl = "https://en.wikipedia.org/wiki/Space_exploration";
-    this.currentTVTitle = "Wikipedia — Space Exploration";
+    this.onToggleBlockGun = null;
+    this.onToggleLinkGun = null;
+    this.onToggleMeetGun = null;
+    this.blockGunArmed = false;
+    this.linkGunArmed = false;
+    this.meetGunArmed = false;
+    this.linkInkUrl = "";
+    this.pendingMeeting = null;
   }
 
   init(onEnter, onChatSend, onMorph, onCameraToggle = null, hyperlaneGate = null, playerSystem = null, audioSystem = null, onBuildPlanet = null, onTuneTV = null) {
@@ -72,14 +92,16 @@ export class Overlay {
     // Initialize in-game morph modal
     this.setupMorphModal();
 
-    // Initialize in-game interstellar starmap modal
-    this.setupStarmapModal();
-
     // Initialize in-game planet builder modal
     this.setupPlanetModal();
 
-    // Initialize in-game Cosmic TV modal
-    this.setupCosmicTVModal();
+    this.setupGravity();
+    this.setupDrive();
+    this.setupLinkGun();
+    this.setupMeeting();
+    this.setupPortraitPickers();
+    this.refreshJoinLinks();
+    this.setupJoinLinkCopy();
 
     this.enterBtn.addEventListener("click", async () => {
       if (this.isEntered) return;
@@ -88,6 +110,17 @@ export class Overlay {
       let rawInput = this.pilotNameInput?.value.trim() || "";
       const avatarUrlInput = document.getElementById("entry-avatar-url");
       let rawUrl = avatarUrlInput ? avatarUrlInput.value.trim() : "";
+      const picture = document.getElementById("entry-avatar-file")?.files?.[0];
+      if (picture) {
+        this.enterBtn.textContent = "FITTING PICTURE...";
+        try {
+          rawUrl = await uploadPortrait(picture);
+        } catch (err) {
+          console.warn("[Overlay] Portrait upload failed:", err);
+          this.addLogItem("⚠️ Picture didn't save. Entered with the chosen form.");
+        }
+        this.enterBtn.textContent = "CLICK TO ENTER SPACE";
+      }
 
       // Smart detection: if someone typed their username into the avatar URL field by mistake
       if (rawUrl && !rawUrl.startsWith("http://") && !rawUrl.startsWith("https://") && !rawUrl.endsWith(".glb") && !rawUrl.endsWith(".gltf")) {
@@ -131,7 +164,7 @@ export class Overlay {
                       document.activeElement?.tagName === "INPUT" || 
                       document.activeElement?.tagName === "TEXTAREA";
 
-      if (e.code === "Enter") {
+      if (e.code === "Enter" && document.activeElement?.id !== "tv-url-input") {
         if (document.activeElement === this.chatInput) {
           const text = this.chatInput.value.trim();
           if (text && this.onChatSend) {
@@ -151,26 +184,56 @@ export class Overlay {
         return;
       }
 
+      if (isInput && (e.code === "Escape" || e.key === "Escape")) {
+        if (this.linkGunModal && this.linkGunModal.style.display === "flex") {
+          this.closeLinkGunModal();
+          e.preventDefault();
+        } else if (this.meetingModal && this.meetingModal.style.display === "flex") {
+          this.closeMeetingModal();
+          e.preventDefault();
+        }
+        return;
+      }
+
       // If user is actively typing in a text field, do not trigger game modals
       if (isInput) return;
 
       const isH = e.code === "KeyH" || e.key === "h" || e.key === "H" || e.keyCode === 72;
       const isB = e.code === "KeyB" || e.key === "b" || e.key === "B" || e.keyCode === 66;
       const isE = e.code === "KeyE" || e.key === "e" || e.key === "E" || e.keyCode === 69;
+      const isM = e.code === "KeyM" || e.key === "m" || e.key === "M" || e.keyCode === 77;
+      const isG = e.code === "KeyG" || e.key === "g" || e.key === "G" || e.keyCode === 71;
+      const isV = e.code === "KeyV" || e.key === "v" || e.key === "V" || e.keyCode === 86;
+      const isF = e.code === "KeyF" || e.key === "f" || e.key === "F" || e.keyCode === 70;
       const isEsc = e.code === "Escape" || e.key === "Escape" || e.keyCode === 27;
 
       if (isH) {
         this.toggleMorphModal();
         e.preventDefault();
       } else if (isB) {
-        this.togglePlanetModal();
+        this.toggleBlockGun();
         e.preventDefault();
       } else if (isE) {
-        this.toggleCosmicTVModal();
+        this.toggleLinkGun();
+        e.preventDefault();
+      } else if (isM) {
+        this.toggleMeetingGun();
+        e.preventDefault();
+      } else if (isG && !e.repeat) {
+        this.playerSystem?.toggleGravity();
+        e.preventDefault();
+      } else if (isV && !e.repeat) {
+        this.tryDrive();
+        e.preventDefault();
+      } else if (isF && !e.repeat && this.playerSystem?.drivingCar) {
+        const cabin = this.playerSystem.vehicleSystem?.toggleCabinView?.();
+        this.addLogItem(cabin ? "👁️ Cabin view (first person)." : "📹 Chase camera.");
         e.preventDefault();
       } else if (isEsc) {
-        if (this.cosmicTvModal && (this.cosmicTvModal.style.display === "flex" || this.cosmicTvModal.style.display === "block")) {
-          this.closeCosmicTVModal();
+        if (this.meetingModal && this.meetingModal.style.display === "flex") {
+          this.closeMeetingModal();
+        } else if (this.linkGunModal && this.linkGunModal.style.display === "flex") {
+          this.closeLinkGunModal();
         } else if (this.planetModal && this.planetModal.style.display === "block") {
           this.closePlanetModal();
         } else if (this.morphModal && this.morphModal.style.display === "block") {
@@ -245,6 +308,32 @@ export class Overlay {
     });
   }
 
+  setupPortraitPickers() {
+    this.bindPortraitPicker("entry-avatar-file", "entry-avatar-preview");
+    this.bindPortraitPicker("morph-avatar-file", "morph-avatar-preview");
+  }
+
+  bindPortraitPicker(inputId, previewId) {
+    const input = document.getElementById(inputId);
+    const preview = document.getElementById(previewId);
+    if (!input || !preview) return;
+    input.addEventListener("change", async () => {
+      const file = input.files?.[0];
+      if (!file) {
+        preview.hidden = true;
+        preview.removeAttribute("src");
+        return;
+      }
+      try {
+        preview.src = await fileToPortrait(file);
+        preview.hidden = false;
+      } catch (err) {
+        preview.hidden = true;
+        console.warn("[Overlay] Portrait preview failed:", err);
+      }
+    });
+  }
+
   setupMorphModal() {
     if (this.hudMorphBtn) {
       this.hudMorphBtn.addEventListener("click", () => {
@@ -252,13 +341,6 @@ export class Overlay {
       });
     }
 
-    if (this.hudCameraBtn) {
-      this.hudCameraBtn.addEventListener("click", () => {
-        if (this.onCameraToggle) {
-          this.onCameraToggle();
-        }
-      });
-    }
 
     // Morph Modal Color Swatches
     const morphSwatches = document.querySelectorAll("#morph-color-swatches .color-swatch");
@@ -272,19 +354,29 @@ export class Overlay {
     // Apply button
     const applyBtn = document.getElementById("morph-apply-btn");
     if (applyBtn) {
-      applyBtn.addEventListener("click", () => {
+      applyBtn.addEventListener("click", async () => {
         const selectedCard = document.querySelector("#morph-avatar-grid .avatar-card.selected");
         const selectedSwatch = document.querySelector("#morph-color-swatches .color-swatch.selected");
         const urlInput = document.getElementById("morph-avatar-url");
         let newUrl = urlInput ? urlInput.value.trim() : "";
+        const picture = document.getElementById("morph-avatar-file")?.files?.[0];
 
         const newType = selectedCard ? selectedCard.dataset.type : this.selectedCharacterType;
         const newColor = selectedSwatch ? selectedSwatch.dataset.color : this.selectedColor;
         const nameInput = document.getElementById("morph-pilot-name");
         let newName = nameInput ? nameInput.value.trim() : "";
 
-        // Smart name detection: if someone typed their username into the avatar URL field by mistake
-        if (newUrl && !newUrl.startsWith("http://") && !newUrl.startsWith("https://") && !newUrl.endsWith(".glb") && !newUrl.endsWith(".gltf")) {
+        if (picture) {
+          applyBtn.textContent = "FITTING...";
+          try {
+            newUrl = await uploadPortrait(picture);
+          } catch (err) {
+            console.warn("[Overlay] Portrait upload failed:", err);
+            this.addLogItem("⚠️ Picture didn't save. Form stayed on the chosen card.");
+            newUrl = "";
+          }
+          applyBtn.textContent = "TRANSMUTE";
+        } else if (newUrl && !newUrl.startsWith("http://") && !newUrl.startsWith("https://") && !newUrl.endsWith(".glb") && !newUrl.endsWith(".gltf")) {
           if (!newName) {
             newName = newUrl;
             newUrl = "";
@@ -420,6 +512,67 @@ export class Overlay {
     }
   }
 
+  getOpenSpaceUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const host = window.location.hostname;
+    const isLocal = host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0";
+    const origin = isLocal ? "https://multiverse-magic.fly.dev" : window.location.origin;
+    const url = new URL("/", origin);
+    url.searchParams.set("system", "sol");
+    const room = params.get("room");
+    if (room) url.searchParams.set("room", room);
+    return url.toString();
+  }
+
+  getMeetingUrl(id) {
+    const url = new URL(this.getOpenSpaceUrl());
+    url.searchParams.set("meet", id);
+    return url.toString();
+  }
+
+  refreshJoinLinks() {
+    const href = this.getOpenSpaceUrl();
+    ["entry-join-link", "hud-join-link"].forEach((id) => {
+      const link = document.getElementById(id);
+      if (!link) return;
+      link.href = href;
+      link.textContent = href;
+    });
+    const beaconInput = document.getElementById("my-system-beacon-url");
+    if (beaconInput) beaconInput.value = href;
+  }
+
+  setupJoinLinkCopy() {
+    const copy = async (button) => {
+      const href = this.getOpenSpaceUrl();
+      try {
+        await navigator.clipboard.writeText(href);
+      } catch (_) {
+        const beaconInput = document.getElementById("my-system-beacon-url");
+        if (beaconInput) {
+          beaconInput.value = href;
+          beaconInput.select();
+          document.execCommand("copy");
+        }
+      }
+      if (!button) return;
+      const previous = button.textContent;
+      button.textContent = "COPIED";
+      setTimeout(() => {
+        button.textContent = previous;
+      }, 1600);
+    };
+
+    document.getElementById("entry-copy-link")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      copy(e.currentTarget);
+    });
+    document.getElementById("hud-copy-link")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      copy(e.currentTarget);
+    });
+  }
+
   toggleStarmapModal() {
     if (!this.starmapModal) return;
     const isVisible = this.starmapModal.style.display === "block";
@@ -436,11 +589,7 @@ export class Overlay {
       document.exitPointerLock();
     }
 
-    // Populate current URL into beacon input
-    const beaconInput = document.getElementById("my-system-beacon-url");
-    if (beaconInput) {
-      beaconInput.value = window.location.origin;
-    }
+    this.refreshJoinLinks();
 
     // Render system cards
     const grid = document.getElementById("starmap-system-grid");
@@ -554,34 +703,121 @@ export class Overlay {
     }
   }
 
-  showEjection(isLocalPlayer, targetId, coords) {
+  showEjection(isLocalPlayer, targetId, coords, cruise = 32) {
     if (isLocalPlayer) {
-      // Local player was ejected
+      this.stranded = true;
       this.ejectionBanner.style.display = "block";
       this.statusDot?.classList.add("ejected");
+      if (this.returnCompass) this.returnCompass.hidden = false;
 
       const dist = Math.sqrt(coords.x * coords.x + coords.y * coords.y + coords.z * coords.z);
+      const burn = this.formatBurn(dist, cruise);
       if (this.ejectionDistance) {
-        this.ejectionDistance.innerText = `Distance to origin: ${Math.round(dist)} units`;
+        this.ejectionDistance.innerText = `${Math.round(dist).toLocaleString()} units out. Full burn home is about ${burn}.`;
       }
 
-      this.addLogItem(`CRITICAL: You were ejected into deep space by community fire!`, true);
+      this.addLogItem(`CRITICAL: Ejected into deep space. Follow the gold star. About ${burn} at full burn.`, true);
 
-      // Dismiss after 8 seconds (or user flies back)
-      setTimeout(() => {
-        this.ejectionBanner.style.display = "none";
-        this.statusDot?.classList.remove("ejected");
-      }, 8000);
+      if (this.ejectionTimer) clearTimeout(this.ejectionTimer);
+      this.ejectionTimer = setTimeout(() => {
+        if (this.ejectionBanner) this.ejectionBanner.style.display = "none";
+      }, 9000);
     } else {
-      // Remote player ejected
       this.addLogItem(`🚨 Pilot [${targetId.slice(0, 6)}] was ejected into deep space!`, true);
     }
+  }
+
+  resumeExile() {
+    this.stranded = true;
+    this.statusDot?.classList.add("ejected");
+    if (this.returnCompass) this.returnCompass.hidden = false;
+    this.addLogItem("🌌 Still in deep space. The gold star is the sector. Burn toward it.", true);
+  }
+
+  formatBurn(distance, speed) {
+    const seconds = Math.max(1, Math.round(distance / Math.max(speed, 1)));
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (mins <= 0) return `${secs}s`;
+    return `${mins}m ${secs.toString().padStart(2, "0")}s`;
+  }
+
+  updateReturnBeacon(position, camera, speed) {
+    if (!this.stranded || !position || !camera) return;
+    const dist = position.length();
+    this.sceneBeacon?.(this.stranded, dist);
+    if (dist < 380) {
+      this.clearReturnBeacon();
+      this.addLogItem("🌌 Sector reacquired. You're back in range.");
+      return;
+    }
+
+    this._home.set(0, 0, 0);
+    const toHome = this._home.clone().sub(position).normalize();
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+    const ahead = toHome.dot(forward);
+    const side = toHome.dot(right);
+    const climb = toHome.dot(up);
+
+    let heading = "BEACON AHEAD";
+    if (ahead < -0.25) heading = "BEACON BEHIND";
+    else if (Math.abs(side) > 0.35 && Math.abs(side) >= Math.abs(climb)) heading = side > 0 ? "BEACON RIGHT" : "BEACON LEFT";
+    else if (climb > 0.35) heading = "BEACON ABOVE";
+    else if (climb < -0.35) heading = "BEACON BELOW";
+    else if (ahead > 0.92) heading = "BURN DEAD AHEAD";
+
+    if (this.returnHeading) this.returnHeading.textContent = heading;
+    if (this.returnMeta) {
+      this.returnMeta.textContent = `${Math.round(dist).toLocaleString()}u out · ${this.formatBurn(dist, speed)} at full burn`;
+    }
+    if (this.returnCompass) this.returnCompass.hidden = false;
+    if (this.returnArrow) {
+      const angle = Math.atan2(side, climb);
+      this.returnArrow.style.transform = `rotate(${angle}rad)`;
+    }
+
+    const projected = this._home.clone().project(camera);
+    let x = projected.x;
+    let y = projected.y;
+    const behind = projected.z > 1;
+    if (behind) {
+      x = -x;
+      y = -y;
+    }
+    const span = Math.hypot(x, y) || 1;
+    const edge = 0.86;
+    const offscreen = behind || span > edge || Math.abs(x) > 0.92 || Math.abs(y) > 0.92;
+    if (offscreen) {
+      x = (x / span) * edge;
+      y = (y / span) * edge;
+    }
+    if (this.returnPip) {
+      this.returnPip.hidden = false;
+      this.returnPip.style.left = `${(x * 0.5 + 0.5) * 100}%`;
+      this.returnPip.style.top = `${(-y * 0.5 + 0.5) * 100}%`;
+      this.returnPip.style.transform = `translate(-50%, -50%) rotate(${Math.atan2(x, y)}rad)`;
+    }
+    if (this.ejectionDistance && this.ejectionBanner?.style.display === "block") {
+      this.ejectionDistance.innerText = `${Math.round(dist).toLocaleString()} units out. Full burn home is about ${this.formatBurn(dist, speed)}.`;
+    }
+  }
+
+  clearReturnBeacon() {
+    this.stranded = false;
+    if (this.ejectionTimer) clearTimeout(this.ejectionTimer);
+    if (this.ejectionBanner) this.ejectionBanner.style.display = "none";
+    if (this.returnCompass) this.returnCompass.hidden = true;
+    if (this.returnPip) this.returnPip.hidden = true;
+    this.statusDot?.classList.remove("ejected");
+    this.sceneBeacon?.(false, 0);
   }
 
   setupPlanetModal() {
     if (this.hudBuildBtn) {
       this.hudBuildBtn.addEventListener("click", () => {
-        this.togglePlanetModal();
+        this.toggleBlockGun();
       });
     }
 
@@ -701,6 +937,89 @@ export class Overlay {
     });
   }
 
+  setupGravity() {
+    this.hudGravityBtn?.addEventListener("click", () => {
+      this.playerSystem?.toggleGravity();
+    });
+  }
+
+  setupDrive() {
+    this.hudDriveBtn?.addEventListener("click", () => {
+      this.tryDrive();
+    });
+  }
+
+  tryDrive() {
+    const vehicles = this.playerSystem?.vehicleSystem;
+    if (!vehicles) return;
+    if (this.playerSystem.drivingCar) {
+      vehicles.exitCar();
+      return;
+    }
+    if (!this.playerSystem.gravityOn) {
+      this.playerSystem.setGravity(true);
+    }
+    const entered = vehicles.enterNearest();
+    if (!entered) {
+      this.addLogItem("🚗 Walk next to a car on a container, then press V.");
+    }
+  }
+
+  setGravityState(on) {
+    if (this.hudGravityBtn) {
+      this.hudGravityBtn.textContent = on ? "🚶 WALKING [G]" : "🪐 GRAVITY [G]";
+      this.hudGravityBtn.classList.toggle("armed", on);
+    }
+    this.addLogItem(on
+      ? "🚶 Gravity on. You drop onto containers. WASD walks, Q jumps, G flies again."
+      : "🪐 Gravity off. You're flying.");
+  }
+
+  setDrivingState(on, kind = "car") {
+    if (this.hudDriveBtn) {
+      this.hudDriveBtn.textContent = on ? "🚪 EXIT CAR [V]" : "🚗 DRIVE [V]";
+      this.hudDriveBtn.classList.toggle("armed", on);
+    }
+    if (this.speedoEl) this.speedoEl.hidden = !on;
+    if (on) {
+      const label =
+        kind === "tractor"
+          ? "tractor"
+          : kind === "banger"
+            ? "old banger"
+            : kind === "concept"
+              ? "concept car"
+              : "supercar";
+      this.addLogItem(
+        `🚗 In a ${label}. WASD drive, mouse look, Shift skid. F chase cam. V exit.`
+      );
+    } else {
+      this.addLogItem("🚶 Left the car.");
+    }
+  }
+
+  updateSpeedo(kmh = 0) {
+    if (!this.speedoValueEl) return;
+    this.speedoValueEl.textContent = String(Math.round(Math.max(0, kmh)));
+  }
+
+  toggleBlockGun() {
+    this.blockGunArmed = !this.blockGunArmed;
+    if (this.hudBuildBtn) {
+      this.hudBuildBtn.textContent = this.blockGunArmed ? "📦 PLACING BLOCKS [B]" : "📦 BLOCK GUN [B]";
+      this.hudBuildBtn.style.background = this.blockGunArmed ? "rgba(0, 255, 136, 0.22)" : "";
+    }
+    if (this.blockGunArmed) {
+      this.setLinkGunArmed(false);
+      this.setMeetGunArmed(false);
+    }
+    this.refreshWeaponHint();
+    this.addLogItem(this.blockGunArmed
+      ? "📦 Block gun armed. Shoot to place a container. Blocks snap together."
+      : "🔫 Laser armed.");
+    if (this.onToggleBlockGun) this.onToggleBlockGun(this.blockGunArmed);
+  }
+
   togglePlanetModal() {
     if (!this.planetModal) return;
     if (this.planetModal.style.display === "block") {
@@ -733,159 +1052,214 @@ export class Overlay {
     }
   }
 
-  setupCosmicTVModal() {
-    if (this.hudTvBtn) {
-      this.hudTvBtn.addEventListener("click", () => {
-        this.toggleCosmicTVModal();
-      });
+  idleWeaponHint() {
+    return "WASD: Fly & Strafe | Q/C: Ascend/Descend<br/>Space: Shoot | E: Link Gun | M: Meeting | B: Block Gun | H: Morph";
+  }
+
+  refreshWeaponHint() {
+    const hint = document.querySelector("#voice-controls-panel .keybind-hint");
+    if (!hint) return;
+    if (this.meetGunArmed) {
+      hint.innerHTML = "WASD: Fly & Strafe | Q/C: Ascend/Descend<br/>Space: Shoot | Left Click / F: Place Meeting | M: Laser | E: Link Gun | B: Block Gun";
+    } else if (this.linkGunArmed) {
+      hint.innerHTML = "WASD: Fly & Strafe | Q/C: Ascend/Descend<br/>Space: Shoot | Left Click / F: Spray Link | E: Laser | M: Meeting | B: Block Gun | H: Morph";
+    } else if (this.blockGunArmed) {
+      hint.innerHTML = "WASD: Fly & Strafe | Q/C: Ascend/Descend<br/>Space: Shoot | Left Click / F: Place Container | B: Laser | E: Link Gun | M: Meeting | H: Morph";
+    } else {
+      hint.innerHTML = this.idleWeaponHint();
     }
+  }
 
-    const closeBtn = document.getElementById("tv-close-btn");
-    if (closeBtn) {
-      closeBtn.addEventListener("click", () => {
-        this.closeCosmicTVModal();
-      });
-    }
+  setupLinkGun() {
+    this.hudLinkBtn?.addEventListener("click", () => this.toggleLinkGun());
+    document.getElementById("link-close-btn")?.addEventListener("click", () => this.closeLinkGunModal());
 
-    const goBtn = document.getElementById("tv-go-btn");
-    const broadcastBtn = document.getElementById("tv-broadcast-btn");
-    const urlInput = document.getElementById("tv-url-input");
-
-    const submitUrl = (broadcast = true) => {
-      let raw = urlInput?.value.trim() || "";
-      if (!raw) raw = "https://en.wikipedia.org/wiki/Space_exploration";
-
-      let finalUrl = raw;
-      if (!finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
-        if (finalUrl.includes(".") && !finalUrl.includes(" ")) {
-          finalUrl = "https://" + finalUrl;
-        } else {
-          finalUrl = `https://en.wikipedia.org/w/index.php?search=${encodeURIComponent(finalUrl)}`;
-        }
+    const load = () => {
+      const raw = document.getElementById("link-url-input")?.value.trim() || "";
+      const url = this.normalizeLinkUrl(raw);
+      if (!url) {
+        this.addLogItem("🔗 That doesn't look like a link.");
+        return;
       }
-
-      let host = finalUrl;
-      try {
-        host = new URL(finalUrl).hostname;
-      } catch (e) {}
-      const title = `Web Broadcast: ${host}`;
-
-      this.loadTVChannel(finalUrl, title, broadcast);
+      this.linkInkUrl = url;
+      this.closeLinkGunModal();
+      this.setBlockGunArmed(false);
+      this.setMeetGunArmed(false);
+      this.setLinkGunArmed(true);
+      this.addLogItem("🔗 Link gun loaded. Shoot a container to tag it. Tags fade in 60 seconds.");
+      this.onToggleLinkGun?.(true);
     };
 
-    if (goBtn) {
-      goBtn.addEventListener("click", () => submitUrl(false));
-    }
-    if (broadcastBtn) {
-      broadcastBtn.addEventListener("click", () => submitUrl(true));
-    }
-    if (urlInput) {
-      urlInput.addEventListener("keydown", (e) => {
-        if (e.code === "Enter") {
-          submitUrl(true);
-        }
-      });
-    }
-
-    // Presets
-    const presetBtns = document.querySelectorAll(".tv-preset-btn");
-    presetBtns.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const url = btn.dataset.url;
-        const title = btn.dataset.title || url;
-        if (urlInput) urlInput.value = url;
-        this.loadTVChannel(url, title, true);
-      });
+    document.getElementById("link-load-btn")?.addEventListener("click", load);
+    document.getElementById("link-url-input")?.addEventListener("keydown", (e) => {
+      if (e.code === "Enter") {
+        e.preventDefault();
+        load();
+      }
     });
   }
 
-  loadTVChannel(url, title = "", broadcast = false) {
-    this.currentTVUrl = url;
-    this.currentTVTitle = title || url;
-
-    const frame = document.getElementById("tv-screen-frame");
-    const statusMsg = document.getElementById("tv-status-msg");
-    const titleEl = document.getElementById("tv-active-title");
-    const urlInput = document.getElementById("tv-url-input");
-
-    if (urlInput) urlInput.value = url;
-    if (titleEl) titleEl.innerText = this.currentTVTitle;
-    if (statusMsg) statusMsg.innerText = `Tuned: ${url}`;
-
-    if (frame) {
-      const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
-      frame.src = proxyUrl;
+  normalizeLinkUrl(raw) {
+    let finalUrl = String(raw || "").trim();
+    if (!finalUrl) return null;
+    if (!finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
+      if (finalUrl.includes(".") && !finalUrl.includes(" ")) {
+        finalUrl = "https://" + finalUrl;
+      } else {
+        finalUrl = `https://en.wikipedia.org/w/index.php?search=${encodeURIComponent(finalUrl)}`;
+      }
     }
-
-    if (broadcast && this.onTuneTV) {
-      this.onTuneTV(url, this.currentTVTitle);
-      this.addLogItem(`📡 [COSMIC TV] Broadcast tuned to: ${url}`);
+    try {
+      const parsed = new URL(finalUrl);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+      return parsed.toString();
+    } catch (_) {
+      return null;
     }
   }
 
-  toggleCosmicTVModal() {
-    if (!this.cosmicTvModal) return;
-    const isVisible = this.cosmicTvModal.style.display === "flex" || this.cosmicTvModal.style.display === "block";
-    if (isVisible) {
-      this.closeCosmicTVModal();
-    } else {
-      this.openCosmicTVModal();
+  setBlockGunArmed(armed) {
+    this.blockGunArmed = armed;
+    if (this.hudBuildBtn) {
+      this.hudBuildBtn.textContent = armed ? "📦 PLACING BLOCKS [B]" : "📦 BLOCK GUN [B]";
+      this.hudBuildBtn.style.background = armed ? "rgba(0, 255, 136, 0.22)" : "";
     }
   }
 
-  openCosmicTVModal(defaultUrl = null, title = null) {
-    if (!this.cosmicTvModal) return;
-    if (document.pointerLockElement) {
-      document.exitPointerLock();
+  setLinkGunArmed(armed) {
+    this.linkGunArmed = armed;
+    if (this.hudLinkBtn) {
+      this.hudLinkBtn.textContent = armed ? "🔗 SPRAYING [E]" : "🔗 LINK GUN [E]";
+      this.hudLinkBtn.style.background = armed ? "rgba(255, 43, 214, 0.22)" : "";
     }
+    this.refreshWeaponHint();
+  }
+
+  toggleLinkGun() {
+    if (this.linkGunModal?.style.display === "flex") {
+      this.closeLinkGunModal();
+      return;
+    }
+    if (!this.linkInkUrl) {
+      this.openLinkGunModal();
+      return;
+    }
+    const armed = !this.linkGunArmed;
+    if (armed) this.setBlockGunArmed(false);
+    this.setLinkGunArmed(armed);
+    this.addLogItem(armed
+      ? "🔗 Link gun armed. Shoot a container to tag it."
+      : "🔫 Laser armed.");
+    this.onToggleLinkGun?.(armed);
+  }
+
+  openLinkGunModal() {
+    if (!this.linkGunModal) return;
+    if (document.pointerLockElement) document.exitPointerLock();
     this.closeMorphModal();
-    this.closeStarmapModal();
     this.closePlanetModal();
-
-    this.cosmicTvModal.style.display = "flex";
-
-    const frame = document.getElementById("tv-screen-frame");
-    const targetUrl = defaultUrl || this.currentTVUrl || "https://en.wikipedia.org/wiki/Space_exploration";
-    const targetTitle = title || this.currentTVTitle || "Wikipedia — Space Exploration";
-
-    if (!frame.src || frame.src === "about:blank" || defaultUrl) {
-      this.loadTVChannel(targetUrl, targetTitle, false);
-    }
-
-    const input = document.getElementById("tv-url-input");
+    this.linkGunModal.style.display = "flex";
+    const input = document.getElementById("link-url-input");
     if (input) {
-      input.value = targetUrl;
+      input.value = this.linkInkUrl;
       setTimeout(() => input.focus(), 50);
     }
   }
 
-  closeCosmicTVModal() {
-    if (!this.cosmicTvModal) return;
-    this.cosmicTvModal.style.display = "none";
-    if (this.isEntered) {
-      document.getElementById("webgl-canvas")?.requestPointerLock();
+  setMeetGunArmed(armed) {
+    this.meetGunArmed = armed;
+    if (this.hudMeetBtn) {
+      this.hudMeetBtn.textContent = armed ? "📅 PLACING MEETING [M]" : "📅 MEETING [M]";
+      this.hudMeetBtn.style.background = armed ? "rgba(255, 215, 0, 0.22)" : "";
     }
+    this.refreshWeaponHint();
   }
 
-  setTVSyncState(channelData) {
-    if (!channelData || !channelData.url) return;
-    this.currentTVUrl = channelData.url;
-    this.currentTVTitle = channelData.title || channelData.url;
-
-    const titleEl = document.getElementById("tv-active-title");
-    const statusMsg = document.getElementById("tv-status-msg");
-    const urlInput = document.getElementById("tv-url-input");
-
-    if (titleEl) titleEl.innerText = this.currentTVTitle;
-    if (statusMsg) statusMsg.innerText = `Tuned by [${channelData.tunedBy || "Pilot"}]: ${channelData.url}`;
-    if (urlInput) urlInput.value = channelData.url;
-
-    if (this.cosmicTvModal && (this.cosmicTvModal.style.display === "flex" || this.cosmicTvModal.style.display === "block")) {
-      const frame = document.getElementById("tv-screen-frame");
-      if (frame) {
-        frame.src = `/api/proxy?url=${encodeURIComponent(channelData.url)}`;
+  setupMeeting() {
+    this.hudMeetBtn?.addEventListener("click", () => this.toggleMeetingGun());
+    document.getElementById("meeting-close-btn")?.addEventListener("click", () => this.closeMeetingModal());
+    document.getElementById("meeting-load-btn")?.addEventListener("click", () => this.loadMeetingFromForm());
+    document.getElementById("meeting-title-input")?.addEventListener("keydown", (e) => {
+      if (e.code === "Enter") {
+        e.preventDefault();
+        this.loadMeetingFromForm();
       }
+    });
+  }
+
+  loadMeetingFromForm() {
+    const title = document.getElementById("meeting-title-input")?.value.trim() || "Meeting";
+    const when = document.getElementById("meeting-when-input")?.value;
+    const startsAt = when ? new Date(when).getTime() : NaN;
+    const now = Date.now();
+    const fiveDays = 5 * 24 * 60 * 60 * 1000;
+    if (!Number.isFinite(startsAt) || startsAt < now - 60 * 1000) {
+      this.addLogItem("📅 Pick a meeting time that hasn't passed.");
+      return;
     }
+    if (startsAt > now + fiveDays) {
+      this.addLogItem("📅 Meetings can only be booked up to 5 days ahead.");
+      return;
+    }
+    this.pendingMeeting = { title: title.slice(0, 40), startsAt };
+    this.closeMeetingModal();
+    this.setBlockGunArmed(false);
+    this.setLinkGunArmed(false);
+    this.setMeetGunArmed(true);
+    this.addLogItem("📅 Meeting loaded. Shoot a container to book it. It stays until that time.");
+    this.onToggleMeetGun?.(true);
+  }
+
+  toggleMeetingGun() {
+    if (this.meetingModal?.style.display === "flex") {
+      this.closeMeetingModal();
+      return;
+    }
+    if (!this.pendingMeeting) {
+      this.openMeetingModal();
+      return;
+    }
+    const armed = !this.meetGunArmed;
+    if (armed) {
+      this.setBlockGunArmed(false);
+      this.setLinkGunArmed(false);
+    }
+    this.setMeetGunArmed(armed);
+    this.addLogItem(armed
+      ? "📅 Meeting gun armed. Shoot a container to book the spot."
+      : "🔫 Laser armed.");
+    this.onToggleMeetGun?.(armed);
+  }
+
+  openMeetingModal() {
+    if (!this.meetingModal) return;
+    if (document.pointerLockElement) document.exitPointerLock();
+    this.closeMorphModal();
+    this.closePlanetModal();
+    this.closeLinkGunModal();
+    const when = document.getElementById("meeting-when-input");
+    if (when) {
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, "0");
+      const local = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      when.min = local(now);
+      when.max = local(new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000));
+      if (!when.value) when.value = local(new Date(now.getTime() + 60 * 60 * 1000));
+    }
+    this.meetingModal.style.display = "flex";
+    setTimeout(() => document.getElementById("meeting-title-input")?.focus(), 50);
+  }
+
+  closeMeetingModal() {
+    if (!this.meetingModal) return;
+    this.meetingModal.style.display = "none";
+    if (this.isEntered) document.getElementById("webgl-canvas")?.requestPointerLock();
+  }
+
+  closeLinkGunModal() {
+    if (!this.linkGunModal) return;
+    this.linkGunModal.style.display = "none";
+    if (this.isEntered) document.getElementById("webgl-canvas")?.requestPointerLock();
   }
 
   addLogItem(text, isAlert = false) {

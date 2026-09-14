@@ -22,6 +22,8 @@ export class CustomPlanet extends WorldObject {
     this.hasAtmosphere = data.hasAtmosphere !== false;
     this.customModelUrl = data.customModelUrl || "";
     this.createdAt = data.createdAt || Date.now();
+    this.health = typeof data.health === "number" ? data.health : 100;
+    this.isDestructible = true;
 
     const pos = data.position || { x: 0, y: -50, z: -200 };
     this.targetPos = new THREE.Vector3(pos.x, pos.y, pos.z);
@@ -96,6 +98,13 @@ export class CustomPlanet extends WorldObject {
 
     // Overhead 3D Holographic Nametag Billboard
     this.buildNametag();
+    this.markHittable();
+  }
+
+  markHittable() {
+    this.mesh.traverse((child) => {
+      if (child.isMesh) child.userData.planetId = this.id;
+    });
   }
 
   // 1. TERRESTRIAL (Earth-like / Continental with swirling clouds)
@@ -413,6 +422,7 @@ export class CustomPlanet extends WorldObject {
         model.scale.set(scale, scale, scale);
 
         this.mesh.add(model);
+        this.markHittable();
       },
       undefined,
       (err) => {
@@ -504,44 +514,80 @@ export class CustomPlanet extends WorldObject {
     }
   }
 
-  // 3D HOLOGRAPHIC NAMETAG BILLBOARD
+  // 3D HOLOGRAPHIC NAMETAG + HEALTH BAR
   buildNametag() {
     if (typeof document === "undefined") return;
     const canvas = document.createElement("canvas");
     canvas.width = 512;
-    canvas.height = 128;
-    const ctx = canvas.getContext("2d");
-
-    // Background gradient banner
-    ctx.fillStyle = "rgba(5, 8, 17, 0.75)";
-    ctx.roundRect(10, 10, 492, 108, 16);
-    ctx.fill();
-    ctx.strokeStyle = this.primaryColor;
-    ctx.lineWidth = 4;
-    ctx.stroke();
-
-    // Planet Title
-    ctx.fillStyle = "#00f0ff";
-    ctx.font = "bold 32px 'JetBrains Mono', monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(`🪐 ${this.name.toUpperCase()}`, 256, 52);
-
-    // Subtitle: Builder & Form
-    ctx.fillStyle = "#e0f2fe";
-    ctx.font = "20px 'JetBrains Mono', monospace";
-    ctx.fillText(`FORGED BY: ${this.builderName} • [${this.form.toUpperCase()}]`, 256, 92);
+    canvas.height = 168;
+    this.nametagCanvas = canvas;
+    this.drawNametag();
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.minFilter = THREE.LinearFilter;
+    this.nametagTexture = texture;
     const spriteMat = new THREE.SpriteMaterial({
       map: texture,
       transparent: true,
       depthWrite: false,
     });
     this.nametagSprite = new THREE.Sprite(spriteMat);
-    this.nametagSprite.position.set(0, this.radius * 1.45 + 12, 0);
-    this.nametagSprite.scale.set(this.radius * 1.8, (this.radius * 1.8) * 0.25, 1);
+    this.nametagSprite.position.set(0, this.radius * 1.45 + 14, 0);
+    const width = this.radius * 1.8;
+    this.nametagSprite.scale.set(width, width * (168 / 512), 1);
     this.mesh.add(this.nametagSprite);
+  }
+
+  setHealth(health) {
+    this.health = Math.max(0, Math.min(100, health));
+    this.drawNametag();
+    if (this.nametagTexture) this.nametagTexture.needsUpdate = true;
+  }
+
+  drawNametag() {
+    const canvas = this.nametagCanvas;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.fillStyle = "rgba(5, 8, 17, 0.82)";
+    ctx.roundRect(10, 10, w - 20, h - 20, 16);
+    ctx.fill();
+    ctx.strokeStyle = this.primaryColor;
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    ctx.fillStyle = "#00f0ff";
+    ctx.font = "bold 32px 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(`🪐 ${this.name.toUpperCase()}`, w / 2, 48);
+
+    ctx.fillStyle = "#e0f2fe";
+    ctx.font = "18px 'JetBrains Mono', monospace";
+    ctx.fillText(`FORGED BY: ${this.builderName}`, w / 2, 82);
+
+    const barX = 36;
+    const barY = 104;
+    const barW = w - 72;
+    const barH = 22;
+    const pct = Math.max(0, Math.min(100, this.health)) / 100;
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
+    ctx.beginPath();
+    ctx.roundRect(barX, barY, barW, barH, 6);
+    ctx.fill();
+
+    if (pct < 0.3) ctx.fillStyle = "#ff0055";
+    else if (pct < 0.6) ctx.fillStyle = "#ffaa00";
+    else ctx.fillStyle = "#00ff88";
+
+    if (pct > 0) {
+      ctx.beginPath();
+      ctx.roundRect(barX, barY, barW * pct, barH, 6);
+      ctx.fill();
+    }
   }
 
   update(delta, time, playerPosition, playerSystem, audioSystem, overlay) {

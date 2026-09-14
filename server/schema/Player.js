@@ -21,6 +21,7 @@ defineTypes(Player, {
   rotation: "number",
   pitch: "number",
   health: "number",
+  driving: "boolean",
 });
 
 /**

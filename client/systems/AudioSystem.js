@@ -635,5 +635,114 @@ export class AudioSystem {
     // Fallback if SpeechSynthesis is unavailable
     this.playRoboVoice(text, volume);
   }
+
+  startEngine() {
+    if (!this.audioContext) return;
+    if (this.audioContext.state === "suspended") {
+      this.audioContext.resume().catch(() => {});
+    }
+    this.stopEngine();
+
+    const ctx = this.audioContext;
+    const now = ctx.currentTime;
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.0001, now);
+    master.gain.exponentialRampToValueAtTime(0.14, now + 0.25);
+    master.connect(ctx.destination);
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(280, now);
+    filter.Q.value = 0.8;
+    filter.connect(master);
+
+    const oscA = ctx.createOscillator();
+    const oscB = ctx.createOscillator();
+    const gainA = ctx.createGain();
+    const gainB = ctx.createGain();
+    oscA.type = "sawtooth";
+    oscB.type = "square";
+    oscA.frequency.setValueAtTime(48, now);
+    oscB.frequency.setValueAtTime(96, now);
+    gainA.gain.value = 0.55;
+    gainB.gain.value = 0.18;
+    oscA.connect(gainA);
+    oscB.connect(gainB);
+    gainA.connect(filter);
+    gainB.connect(filter);
+    oscA.start(now);
+    oscB.start(now);
+
+    const noiseLen = ctx.sampleRate * 1.0;
+    const noiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
+    const data = noiseBuf.getChannelData(0);
+    for (let i = 0; i < noiseLen; i++) data[i] = Math.random() * 2 - 1;
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuf;
+    noise.loop = true;
+    const noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type = "bandpass";
+    noiseFilter.frequency.value = 900;
+    noiseFilter.Q.value = 0.6;
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.value = 0.0001;
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(master);
+    noise.start(now);
+
+    // Extra skid layer for hard slides / handbrake.
+    const skid = ctx.createBufferSource();
+    skid.buffer = noiseBuf;
+    skid.loop = true;
+    const skidFilter = ctx.createBiquadFilter();
+    skidFilter.type = "highpass";
+    skidFilter.frequency.value = 1400;
+    const skidGain = ctx.createGain();
+    skidGain.gain.value = 0.0001;
+    skid.connect(skidFilter);
+    skidFilter.connect(skidGain);
+    skidGain.connect(master);
+    skid.start(now);
+
+    this.engineNodes = {
+      master, filter, oscA, oscB, gainA, gainB, noise, noiseGain, skid, skidGain,
+    };
+  }
+
+  updateEngine(speedAbs = 0, throttleAbs = 0, slip = 0) {
+    const nodes = this.engineNodes;
+    if (!nodes || !this.audioContext) return;
+    const now = this.audioContext.currentTime;
+    const rpm = 48 + speedAbs * 3.6 + throttleAbs * 22;
+    nodes.oscA.frequency.setTargetAtTime(rpm, now, 0.08);
+    nodes.oscB.frequency.setTargetAtTime(rpm * 2.02, now, 0.08);
+    nodes.filter.frequency.setTargetAtTime(260 + speedAbs * 20 + throttleAbs * 140, now, 0.1);
+    const vol = 0.07 + Math.min(0.16, speedAbs * 0.0045) + throttleAbs * 0.05;
+    nodes.master.gain.setTargetAtTime(vol, now, 0.08);
+    const hiss = 0.004 + Math.min(0.055, speedAbs * 0.0016);
+    nodes.noiseGain.gain.setTargetAtTime(hiss, now, 0.1);
+    const skidVol = slip > 5 ? Math.min(0.12, (slip - 5) * 0.012) : 0.0001;
+    nodes.skidGain.gain.setTargetAtTime(skidVol, now, 0.05);
+  }
+
+  stopEngine() {
+    const nodes = this.engineNodes;
+    if (!nodes || !this.audioContext) {
+      this.engineNodes = null;
+      return;
+    }
+    const now = this.audioContext.currentTime;
+    try {
+      nodes.master.gain.cancelScheduledValues(now);
+      nodes.master.gain.setValueAtTime(Math.max(0.0001, nodes.master.gain.value), now);
+      nodes.master.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+      nodes.oscA.stop(now + 0.25);
+      nodes.oscB.stop(now + 0.25);
+      nodes.noise.stop(now + 0.25);
+      nodes.skid?.stop(now + 0.25);
+    } catch (_) {}
+    this.engineNodes = null;
+  }
 }
 

@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { BLOCK_SIZE, snapBlockPosition, blockCellKey, faceFromNormal, graffitiMeshes } from "./BuildBlock.js";
 
 /**
  * CombatSystem handles laser raycasting, target detection, laser beam rendering,
@@ -15,6 +16,9 @@ export class CombatSystem {
 
     this.lastShootTime = 0;
     this.shootCooldown = 400; // 400ms cooldown
+    this.spaceHeld = false;
+    this.weaponMode = "laser"; // "laser" | "block" | "link"
+    this.lastPlaceTime = 0;
 
     // Active visual effects pools
     this.activeBeams = [];
@@ -24,10 +28,11 @@ export class CombatSystem {
     this._listenersBound = false;
   }
 
-  init(networkSystem, playerSystem, audioSystem) {
+  init(networkSystem, playerSystem, audioSystem, worldSystem = null) {
     this.networkSystem = networkSystem;
     this.playerSystem = playerSystem;
     this.audioSystem = audioSystem;
+    this.worldSystem = worldSystem;
 
     if (this._listenersBound) return;
     this._listenersBound = true;
@@ -40,13 +45,20 @@ export class CombatSystem {
         target.tagName === "INPUT" ||
         target.tagName === "BUTTON" ||
         target.closest("#morph-modal") ||
-        target.closest("#entry-overlay")
+        target.closest("#entry-overlay") ||
+        target.closest("#graffiti-links") ||
+        target.closest("#link-gun-modal") ||
+        target.closest("#meeting-modal") ||
+        target.closest("#jumpgate-proximity-banner a")
       ) {
         return;
       }
 
       // Left click
       if (e.button === 0) {
+        if (this.weaponMode !== "link" && this.weaponMode !== "meet" && this.openGraffitiAtCrosshair()) {
+          return;
+        }
         // Auto-request pointer lock if not locked
         if (
           this.playerSystem &&
@@ -59,27 +71,77 @@ export class CombatSystem {
       }
     });
 
-    // Keyboard trigger: KeyF to fire laser
+    // KeyF follows the armed gun. Space always fires the laser, even through a tag.
     window.addEventListener("keydown", (e) => {
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
       if (e.code === "KeyF" && !e.repeat) {
         this.shoot();
       }
+      if (e.code === "Space") {
+        e.preventDefault();
+        this.spaceHeld = true;
+        this.fireLaser();
+      }
     });
+    window.addEventListener("keyup", (e) => {
+      if (e.code === "Space") this.spaceHeld = false;
+    });
+    window.addEventListener("blur", () => {
+      this.spaceHeld = false;
+    });
+  }
+
+  setWeaponMode(mode) {
+    if (mode === "block" || mode === "link" || mode === "meet") this.weaponMode = mode;
+    else this.weaponMode = "laser";
+  }
+
+  openGraffitiAtCrosshair() {
+    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
+    this.raycaster.far = 80;
+    const stickers = graffitiMeshes(this.worldSystem?.objects);
+    const hits = stickers.length ? this.raycaster.intersectObjects(stickers, false) : [];
+    const url = hits[0]?.object.userData.graffitiUrl;
+    if (!url) return false;
+    const opener = document.createElement("a");
+    opener.href = url;
+    opener.target = "_blank";
+    opener.rel = "noopener noreferrer";
+    document.body.appendChild(opener);
+    opener.click();
+    opener.remove();
+    return true;
   }
 
   shoot() {
     if (!this.playerSystem) return;
+    if (this.weaponMode === "block") {
+      this.placeBlock();
+      return;
+    }
+    if (this.weaponMode === "link") {
+      this.paintLink();
+      return;
+    }
+    if (this.weaponMode === "meet") {
+      this.paintMeeting();
+      return;
+    }
 
+    this.fireLaser();
+  }
+
+  fireLaser() {
+    if (!this.playerSystem) return;
     const now = performance.now();
     if (now - this.lastShootTime < this.shootCooldown) return;
     this.lastShootTime = now;
 
     // 1. Raycast from camera center (crosshair at 0, 0)
     this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
-    this.raycaster.far = 280.0;
+    this.raycaster.far = 480.0;
 
-    // Gather candidate meshes from remote players
+    // Gather candidate meshes from remote players and destructible planets
     const targets = [];
     this.playerSystem.remotePlayers.forEach((remote, sessionId) => {
       remote.mesh.traverse((child) => {
@@ -89,32 +151,32 @@ export class CombatSystem {
         }
       });
     });
+    this.worldSystem?.objects.forEach((obj) => {
+      if (!obj.isDestructible || !obj.mesh) return;
+      obj.mesh.traverse((child) => {
+        if (child.isMesh) {
+          child.userData.planetId = obj.id;
+          targets.push(child);
+        }
+      });
+    });
 
     const intersects = this.raycaster.intersectObjects(targets, false);
 
-    // Calculate weapon origin: FPS viewport blaster or 3rd-person Thor's Hammer
-    let laserOrigin;
-    if (this.playerSystem?.cameraMode === "fps") {
-      // In First-Person Mode, laser fires from the lower-right weapon hand in front of the camera
-      const fpsWeaponOffset = new THREE.Vector3(0.35, -0.22, -0.55).applyQuaternion(this.camera.quaternion);
-      laserOrigin = this.camera.position.clone().add(fpsWeaponOffset);
-    } else {
-      // In Third-Person Mode, laser fires from Thor's Hammer / right arm
-      const shipPos = this.playerSystem.position.clone();
-      const shipQuat = this.playerSystem.quaternion.clone();
-      const weaponOffset = new THREE.Vector3(0.65, 0.95, -1.0).applyQuaternion(shipQuat);
-      laserOrigin = shipPos.clone().add(weaponOffset);
-    }
+    // Beam starts off to the side and travels into the crosshair hit.
+    const laserOrigin = this.laserOrigin();
 
     let hitPoint = null;
     let hitTargetId = null;
 
+    const boxHit = this.closestContainerHit();
+
     if (intersects.length > 0) {
       const hit = intersects[0];
       hitPoint = hit.point;
-      hitTargetId = hit.object.userData.targetSessionId;
+      hitTargetId = hit.object.userData.planetId || hit.object.userData.targetSessionId;
     } else {
-      // Also check bounding sphere for smooth hit registration
+      // Also check bounding volumes for smooth hit registration
       const ray = this.raycaster.ray;
       let closestDist = Infinity;
       this.playerSystem.remotePlayers.forEach((remote, sessionId) => {
@@ -129,6 +191,27 @@ export class CombatSystem {
           }
         }
       });
+      this.worldSystem?.objects.forEach((obj) => {
+        if (!obj.isDestructible || !obj.mesh) return;
+        const center = obj.mesh.position;
+        const hitRadius = Math.max(12, obj.radius || 20);
+        if (ray.distanceToPoint(center) < hitRadius) {
+          const distFromCam = this.camera.position.distanceTo(center);
+          if (distFromCam < closestDist && distFromCam < 300 + hitRadius) {
+            closestDist = distFromCam;
+            hitTargetId = obj.id;
+            hitPoint = center.clone();
+          }
+        }
+      });
+    }
+
+    if (boxHit) {
+      const currentDist = hitPoint ? this.camera.position.distanceTo(hitPoint) : Infinity;
+      if (boxHit.dist <= currentDist + 0.05) {
+        hitTargetId = boxHit.id;
+        hitPoint = boxHit.point;
+      }
     }
 
     if (!hitPoint) {
@@ -158,6 +241,195 @@ export class CombatSystem {
         hitPoint
       );
     }
+  }
+
+  closestContainerHit() {
+    const ray = this.raycaster.ray;
+    const size = new THREE.Vector3(BLOCK_SIZE.x, BLOCK_SIZE.y, BLOCK_SIZE.z);
+    const box = new THREE.Box3();
+    const point = new THREE.Vector3();
+    let best = null;
+    this.worldSystem?.objects.forEach((obj) => {
+      if (!obj.isBuildBlock || !obj.mesh) return;
+      box.setFromCenterAndSize(obj.mesh.position, size);
+      if (!ray.intersectBox(box, point)) return;
+      const dist = ray.origin.distanceTo(point);
+      if (dist > this.raycaster.far) return;
+      if (!best || dist < best.dist) best = { id: obj.id, point: point.clone(), dist };
+    });
+    return best;
+  }
+
+  placeBlock() {
+    const now = performance.now();
+    if (now - this.lastPlaceTime < 400) return;
+    this.lastPlaceTime = now;
+
+    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
+    this.raycaster.far = 80;
+
+    const targets = [];
+    this.worldSystem?.objects.forEach((obj) => {
+      if (!obj.isDestructible || !obj.mesh) return;
+      obj.mesh.traverse((child) => {
+        if (child.isMesh) targets.push(child);
+      });
+    });
+
+    const hits = targets.length ? this.raycaster.intersectObjects(targets, false) : [];
+    const shot = this.laserOrigin();
+    let placeAt = null;
+
+    if (hits.length > 0 && hits[0].face) {
+      const hit = hits[0];
+      const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
+      const step = this.gridStep(normal);
+      let candidate = snapBlockPosition(
+        hit.point.x + step.x * 0.55,
+        hit.point.y + step.y * 0.55,
+        hit.point.z + step.z * 0.55
+      );
+      for (let i = 0; i < 4; i++) {
+        if (!this.blockCellOccupied(candidate)) {
+          placeAt = candidate;
+          break;
+        }
+        candidate = snapBlockPosition(
+          candidate.x + step.x,
+          candidate.y + step.y,
+          candidate.z + step.z
+        );
+      }
+    } else {
+      const along = this.raycaster.ray.origin.clone().add(
+        this.raycaster.ray.direction.clone().multiplyScalar(36)
+      );
+      placeAt = snapBlockPosition(along.x, along.y, along.z);
+      if (this.blockCellOccupied(placeAt)) placeAt = null;
+    }
+
+    const end = placeAt
+      ? new THREE.Vector3(placeAt.x, placeAt.y, placeAt.z)
+      : this.raycaster.ray.origin.clone().add(this.raycaster.ray.direction.clone().multiplyScalar(36));
+
+    this.createLaserBeam(shot, end, 0xffd700);
+    this.createMuzzleFlash(shot, 0xffd700);
+    this.audioSystem?.playPewSound();
+
+    if (!placeAt || !this.networkSystem) return;
+    const color = "#" + (this.playerSystem.characterColor >>> 0).toString(16).padStart(6, "0").slice(-6);
+    this.networkSystem.sendPlaceBlock(placeAt.x, placeAt.y, placeAt.z, color);
+  }
+
+  paintLink() {
+    const now = performance.now();
+    if (now - this.lastPlaceTime < 400) return;
+    this.lastPlaceTime = now;
+
+    const url = window.multiverseApp?.overlay?.linkInkUrl;
+    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
+    this.raycaster.far = 80;
+
+    const targets = [];
+    this.worldSystem?.objects.forEach((obj) => {
+      if (!obj.isBuildBlock || !obj.mesh) return;
+      obj.mesh.traverse((child) => {
+        if (child.isMesh) targets.push(child);
+      });
+    });
+    const hits = targets.length ? this.raycaster.intersectObjects(targets, false) : [];
+    const shot = this.laserOrigin();
+    const hit = hits[0];
+    const end = hit?.point
+      ? hit.point.clone()
+      : this.raycaster.ray.origin.clone().add(this.raycaster.ray.direction.clone().multiplyScalar(36));
+
+    this.createLaserBeam(shot, end, 0xff2bd6);
+    this.createMuzzleFlash(shot, 0xff2bd6);
+    this.audioSystem?.playPewSound();
+
+    if (!url) {
+      window.multiverseApp?.overlay?.openLinkGunModal();
+      window.multiverseApp?.overlay?.addLogItem("🔗 Load a link before spraying a tag.");
+      return;
+    }
+    if (!hit?.face || !this.networkSystem) {
+      window.multiverseApp?.overlay?.addLogItem("🔗 Aim at a container to spray a link.");
+      return;
+    }
+
+    const blockId = hit.object.userData.blockId || hit.object.userData.planetId;
+    const face = hit.object.userData.graffitiFace || faceFromNormal(
+      hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize()
+    );
+    this.networkSystem.sendPaintLink(blockId, face, url);
+  }
+
+  paintMeeting() {
+    const now = performance.now();
+    if (now - this.lastPlaceTime < 400) return;
+    this.lastPlaceTime = now;
+
+    const pending = window.multiverseApp?.overlay?.pendingMeeting;
+    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
+    this.raycaster.far = 80;
+
+    const targets = [];
+    this.worldSystem?.objects.forEach((obj) => {
+      if (!obj.isBuildBlock || !obj.mesh) return;
+      obj.mesh.traverse((child) => {
+        if (child.isMesh) targets.push(child);
+      });
+    });
+    const hits = targets.length ? this.raycaster.intersectObjects(targets, false) : [];
+    const shot = this.laserOrigin();
+    const hit = hits[0];
+    const end = hit?.point
+      ? hit.point.clone()
+      : this.raycaster.ray.origin.clone().add(this.raycaster.ray.direction.clone().multiplyScalar(36));
+
+    this.createLaserBeam(shot, end, 0xffd700);
+    this.createMuzzleFlash(shot, 0xffd700);
+    this.audioSystem?.playPewSound();
+
+    if (!pending?.startsAt) {
+      window.multiverseApp?.overlay?.openMeetingModal();
+      window.multiverseApp?.overlay?.addLogItem("📅 Set a meeting time, then shoot a container.");
+      return;
+    }
+    if (!hit?.face || !this.networkSystem) {
+      window.multiverseApp?.overlay?.addLogItem("📅 Aim at a container to place the meeting.");
+      return;
+    }
+
+    const blockId = hit.object.userData.blockId || hit.object.userData.planetId;
+    const face = hit.object.userData.graffitiFace || faceFromNormal(
+      hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize()
+    );
+    this.networkSystem.sendScheduleMeeting(blockId, face, pending.title, pending.startsAt);
+  }
+
+  laserOrigin() {
+    const offset = new THREE.Vector3(0.35, -0.22, -0.55).applyQuaternion(this.camera.quaternion);
+    return this.camera.position.clone().add(offset);
+  }
+
+  gridStep(normal) {
+    const ax = Math.abs(normal.x);
+    const ay = Math.abs(normal.y);
+    const az = Math.abs(normal.z);
+    if (ax >= ay && ax >= az) return new THREE.Vector3(Math.sign(normal.x || 1) * BLOCK_SIZE.x, 0, 0);
+    if (ay >= az) return new THREE.Vector3(0, Math.sign(normal.y || 1) * BLOCK_SIZE.y, 0);
+    return new THREE.Vector3(0, 0, Math.sign(normal.z || 1) * BLOCK_SIZE.z);
+  }
+
+  blockCellOccupied(pos) {
+    const key = blockCellKey(pos.x, pos.y, pos.z);
+    let taken = false;
+    this.worldSystem?.objects.forEach((obj) => {
+      if (obj.isBuildBlock && obj.cellKey === key) taken = true;
+    });
+    return taken;
   }
 
   /**
@@ -385,6 +657,8 @@ export class CombatSystem {
   }
 
   update(delta) {
+    if (this.spaceHeld) this.fireLaser();
+
     // 1. Update volumetric laser beams
     for (let i = this.activeBeams.length - 1; i >= 0; i--) {
       const beam = this.activeBeams[i];

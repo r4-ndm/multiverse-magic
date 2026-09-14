@@ -4,10 +4,12 @@ import { PlayerSystem } from "./systems/PlayerSystem.js";
 import { NetworkSystem } from "./systems/NetworkSystem.js";
 import { AudioSystem } from "./systems/AudioSystem.js";
 import { CombatSystem } from "./systems/CombatSystem.js";
-import { WorldSystem, PlanetBeacon, HyperlaneGate } from "./systems/WorldObject.js";
+import { WorldSystem, PlanetBeacon } from "./systems/WorldObject.js";
 import { CustomPlanet } from "./systems/Planet.js";
-import { CosmicTV } from "./systems/CosmicTV.js";
+import { BuildBlock } from "./systems/BuildBlock.js";
+import { updateGraffitiLinks } from "./systems/BuildBlock.js";
 import { Overlay } from "./ui/Overlay.js";
+import { VehicleSystem } from "./systems/VehicleSystem.js";
 
 /**
  * OpenSpace — Client Main Orchestrator
@@ -28,8 +30,8 @@ class OpenSpaceApp {
     this.audioSystem = null;
     this.combatSystem = null;
     this.worldSystem = null;
-    this.hyperlaneGate = null;
-    this.cosmicTV = null;
+    this.vehicleSystem = null;
+    this.pendingLinks = [];
 
     this.isEntered = false;
     window.multiverseApp = this;
@@ -47,58 +49,13 @@ class OpenSpaceApp {
     this.audioSystem = new AudioSystem(camera);
 
     this.worldSystem = new WorldSystem(scene);
+    this.vehicleSystem = new VehicleSystem(scene);
+    this.vehicleSystem.init(this.playerSystem, this.worldSystem, this.audioSystem);
 
-    // Read current solar system from URL query parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    this.currentSystemId = urlParams.get("system") || "sol";
+    this.currentSystemId = "sol";
+    this.currentSystemName = "OPEN SPACE";
 
-    // Configure system theme and jump destination
-    this.currentSystemName = "SOL PRIME";
-    let gateDestName = "VEGA OUTPOST";
-    let gateDestUrl = "/?system=vega";
-    let gateDist = 14.2;
-
-    if (this.currentSystemId === "vega") {
-      this.currentSystemName = "VEGA OUTPOST";
-      gateDestName = "SOL PRIME";
-      gateDestUrl = "/?system=sol";
-      gateDist = 14.2;
-    } else if (this.currentSystemId === "kepler") {
-      this.currentSystemName = "KEPLER VOID";
-      gateDestName = "SOL PRIME";
-      gateDestUrl = "/?system=sol";
-      gateDist = 48.7;
-    } else if (this.currentSystemId === "centauri") {
-      this.currentSystemName = "ALPHA CENTAURI";
-      gateDestName = "SOL PRIME";
-      gateDestUrl = "/?system=sol";
-      gateDist = 4.3;
-    }
-
-    // Register distant planetoid beacon & massive Interstellar Hyperlane Gate
     this.worldSystem.register(new PlanetBeacon("nexus_beacon", new THREE.Vector3(0, -120, -350), 45));
-    this.hyperlaneGate = new HyperlaneGate("main_hyperlane_gate", new THREE.Vector3(0, 15, -150), gateDestName, gateDestUrl, gateDist);
-    this.worldSystem.register(this.hyperlaneGate);
-
-    // Register Flying Retro-Futuristic Cosmic Web TV in orbit
-    this.cosmicTV = new CosmicTV("cosmic_tv_sol", new THREE.Vector3(-38, 12, -65));
-    this.worldSystem.register(this.cosmicTV);
-
-    // Keyboard trigger: KeyJ for Hyperdrive Jump or Starmap
-    window.addEventListener("keydown", (e) => {
-      if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") {
-        return;
-      }
-      const isJ = e.code === "KeyJ" || e.key === "j" || e.key === "J" || e.keyCode === 74;
-      if (isJ && !e.repeat) {
-        if (this.hyperlaneGate?.isNearGate(this.playerSystem?.position)) {
-          this.hyperlaneGate.engageJump(this.playerSystem, this.audioSystem, this.overlay);
-        } else {
-          this.overlay?.toggleStarmapModal();
-        }
-        e.preventDefault();
-      }
-    });
 
     // 3. Initialize Overlay UI and entry flow
     this.overlay.init(
@@ -119,14 +76,9 @@ class OpenSpaceApp {
         }
         this.playerSystem.setLocalCharacter(newType, newColor, newUrl);
         this.networkSystem.sendSetCharacter(newType, newColor, newUrl);
-
-        // Automatically switch to 3rd-person view so the player sees their new avatar form!
-        this.playerSystem.setCameraMode("third");
       },
-      () => {
-        this.playerSystem?.toggleCameraMode();
-      },
-      this.hyperlaneGate,
+      null,
+      null,
       this.playerSystem,
       this.audioSystem,
       (planetConfig) => {
@@ -141,11 +93,24 @@ class OpenSpaceApp {
         planetConfig.position = { x: spawnPos.x, y: spawnPos.y, z: spawnPos.z };
         this.networkSystem.sendBuildPlanet(planetConfig);
       },
-      (url, title) => {
-        this.networkSystem.sendTuneTV(url, title);
-        this.cosmicTV?.setChannel(url, title);
-      }
+      null
     );
+    this.overlay.onToggleBlockGun = (armed) => {
+      this.combatSystem?.setWeaponMode(armed ? "block" : "laser");
+    };
+    this.overlay.onToggleLinkGun = (armed) => {
+      this.combatSystem?.setWeaponMode(armed ? "link" : "laser");
+    };
+    this.overlay.onToggleMeetGun = (armed) => {
+      this.combatSystem?.setWeaponMode(armed ? "meet" : "laser");
+    };
+    this.playerSystem.worldSystem = this.worldSystem;
+    this.playerSystem.onGravityChange = (on) => {
+      this.overlay?.setGravityState(on);
+    };
+    this.vehicleSystem.onDrivingChange = (on, kind) => {
+      this.overlay?.setDrivingState(on, kind);
+    };
 
     // 4. Start Render Loop
     this.animate();
@@ -159,6 +124,7 @@ class OpenSpaceApp {
 
     // 1. Audio Activation: user gesture enables AudioContext & getUserMedia mic stream
     const audioResult = await this.audioSystem.init(this.networkSystem, this.playerSystem);
+    this.vehicleSystem?.setAudio(this.audioSystem);
     if (!audioResult.hasMic) {
       this.overlay.addLogItem("🎙️ Microphone unavailable: Entered in Listen-Only mode");
     } else {
@@ -168,7 +134,7 @@ class OpenSpaceApp {
     // 2. Connect to Colyseus Server
     try {
       // Initialize Combat System with network and audio
-      this.combatSystem.init(this.networkSystem, this.playerSystem, this.audioSystem);
+      this.combatSystem.init(this.networkSystem, this.playerSystem, this.audioSystem, this.worldSystem);
 
       // Wire up network event handlers BEFORE connecting so onPlayerAdd catches local player
       this.setupNetworkHooks();
@@ -275,7 +241,7 @@ class OpenSpaceApp {
           data.ejectionCoords.z
         );
         this.playerSystem.setLocalHealth(100);
-        this.overlay.showEjection(true, targetName, data.ejectionCoords);
+        this.overlay.showEjection(true, targetName, data.ejectionCoords, this.playerSystem.deepCruise);
       } else {
         // Remote player ejected
         const remote = this.playerSystem.remotePlayers.get(data.targetId);
@@ -289,6 +255,10 @@ class OpenSpaceApp {
         this.audioSystem.disconnectPeer(data.targetId);
         this.overlay.showEjection(false, targetName, data.ejectionCoords);
       }
+    };
+
+    this.networkSystem.onStillExiled = () => {
+      this.overlay.resumeExile();
     };
 
     // 6. WebRTC Signaling relay
@@ -336,24 +306,170 @@ class OpenSpaceApp {
       }
     };
 
+    this.networkSystem.onPlanetDamaged = (data) => {
+      const planet = data?.id ? this.worldSystem.objects.get(data.id) : null;
+      if (planet?.setHealth && typeof data.health === "number") {
+        planet.setHealth(data.health);
+      }
+    };
+
+    const paintMeeting = (data) => {
+      if (!data?.blockId || !data.face || !data.id) return;
+      const block = this.worldSystem.objects.get(data.blockId);
+      if (!block?.setGraffiti) return;
+      block.tags?.forEach((tag, face) => {
+        if (face !== data.face && tag.meta?.kind === "meeting") block.clearGraffiti(face);
+      });
+      const url = this.overlay?.getMeetingUrl(data.id) || `/?meet=${data.id}`;
+      block.setGraffiti(data.face, url, Infinity, {
+        kind: "meeting",
+        title: data.title,
+        startsAt: data.startsAt,
+        meetId: data.id,
+      });
+    };
+
+    const spawnBlock = (data) => {
+      if (!data?.id || this.worldSystem.objects.has(data.id)) return;
+      this.worldSystem.register(new BuildBlock(data));
+      const block = this.worldSystem.objects.get(data.id);
+      if (block) this.vehicleSystem?.spawnForBlock(block);
+      if (data.meeting) {
+        paintMeeting({
+          blockId: data.id,
+          face: data.meeting.face,
+          id: data.meeting.id,
+          title: data.meeting.title,
+          startsAt: data.meeting.startsAt,
+        });
+      }
+      this.pendingLinks = this.pendingLinks.filter((link) => {
+        if (link.blockId !== data.id) return true;
+        this.applyLink(link);
+        return false;
+      });
+    };
+
+    this.forgetSprayedLink = (blockId, face) => {
+      this.pendingLinks = this.pendingLinks.filter((link) => {
+        if (link.blockId !== blockId || (face && link.face !== face)) return true;
+        link.url = "";
+        return false;
+      });
+    };
+
+    this.sweepExpiredLinks = () => {
+      const now = Date.now();
+      this.pendingLinks = this.pendingLinks.filter((link) => {
+        if (link.expiresAt && now < link.expiresAt) return true;
+        link.url = "";
+        return false;
+      });
+    };
+
+    this.applyLink = (data) => {
+      if (!data?.blockId || !data.face) return;
+      if (!data.url || !data.expiresAt || Date.now() >= data.expiresAt) {
+        this.forgetSprayedLink(data.blockId, data.face);
+        const gone = this.worldSystem.objects.get(data.blockId);
+        if (gone?.tags?.get(data.face)?.meta?.kind !== "meeting") gone?.clearGraffiti?.(data.face);
+        return;
+      }
+      const block = this.worldSystem.objects.get(data.blockId);
+      if (!block?.setGraffiti) {
+        this.pendingLinks = this.pendingLinks.filter((link) => !(link.blockId === data.blockId && link.face === data.face));
+        this.pendingLinks.push(data);
+        return;
+      }
+      this.forgetSprayedLink(data.blockId, data.face);
+      block.setGraffiti(data.face, data.url, data.expiresAt);
+    };
+
+    this.networkSystem.onBlocksSync = (blocks) => {
+      if (!Array.isArray(blocks)) return;
+      blocks.forEach(spawnBlock);
+    };
+
+    this.networkSystem.onBlockPlaced = (data) => {
+      spawnBlock(data);
+    };
+
+    this.networkSystem.onBlockDamaged = (data) => {
+      const block = data?.id ? this.worldSystem.objects.get(data.id) : null;
+      if (block?.setHealth && typeof data.health === "number") {
+        block.setHealth(data.health);
+      }
+    };
+
+    this.networkSystem.onBlockDeleted = (blockId) => {
+      const block = this.worldSystem.objects.get(blockId);
+      if (block?.mesh && this.combatSystem) {
+        this.combatSystem.createHitSpark(block.mesh.position.clone(), 0xffd700);
+      }
+      this.vehicleSystem?.removeForBlock(blockId);
+      this.forgetSprayedLink(blockId);
+      this.worldSystem.unregister(blockId);
+      this.overlay?.addLogItem("💥 Container destroyed.");
+    };
+
+    this.networkSystem.onBlockRejected = (data) => {
+      this.overlay?.addLogItem(`📦 ${data?.reason || "Couldn't place that container."}`);
+    };
+
     this.networkSystem.onPlanetDeleted = (planetId) => {
+      const planet = this.worldSystem.objects.get(planetId);
+      if (planet?.mesh && this.combatSystem) {
+        const origin = planet.mesh.position.clone();
+        this.combatSystem.createHitSpark(origin, 0xff6600);
+        this.combatSystem.createHitSpark(origin.clone().add(new THREE.Vector3(4, 2, 0)), 0xff0055);
+        this.combatSystem.createHitSpark(origin.clone().add(new THREE.Vector3(-3, -1, 2)), 0xffd700);
+      }
       this.worldSystem.unregister(planetId);
     };
 
-    // 10. Cosmic TV Network Synchronization
-    this.networkSystem.onTVSync = (tvData) => {
-      if (tvData && tvData.url) {
-        this.cosmicTV?.setChannel(tvData.url, tvData.title);
-        this.overlay?.setTVSyncState(tvData);
-      }
+    this.networkSystem.onLinksSync = (links) => {
+      if (!Array.isArray(links)) return;
+      links.forEach((link) => this.applyLink(link));
+    };
+    this.networkSystem.onLinkPainted = (data) => this.applyLink(data);
+    this.networkSystem.onLinkCleared = (data) => {
+      if (!data?.blockId) return;
+      this.forgetSprayedLink(data.blockId, data.face);
+      const block = this.worldSystem.objects.get(data.blockId);
+      if (block?.tags?.get(data.face)?.meta?.kind === "meeting") return;
+      block?.clearGraffiti?.(data.face);
+    };
+    this.networkSystem.onLinkRejected = (data) => {
+      this.overlay?.addLogItem(`🔗 ${data?.reason || "Couldn't spray that link."}`);
     };
 
-    this.networkSystem.onTVTuned = (tvData) => {
-      if (tvData && tvData.url) {
-        this.cosmicTV?.setChannel(tvData.url, tvData.title);
-        this.overlay?.setTVSyncState(tvData);
-        this.overlay?.addLogItem(`📺 [COSMIC TV] Pilot [${tvData.tunedBy || "Pilot"}] tuned broadcast to: "${tvData.title || tvData.url}"`);
+    this.networkSystem.onMeetingScheduled = (data) => {
+      paintMeeting(data);
+      const href = this.overlay?.getMeetingUrl(data.id);
+      if (data.hostId === this.networkSystem.sessionId && href) {
+        navigator.clipboard?.writeText(href).catch(() => {});
+        this.overlay?.addLogItem(`📅 Meeting booked. Save this link: ${href}`);
       }
+    };
+    this.networkSystem.onMeetingRejected = (data) => {
+      this.overlay?.addLogItem(`📅 ${data?.reason || "Couldn't book that meeting."}`);
+    };
+    this.networkSystem.onMeetArrived = (data) => {
+      if (!data) return;
+      this.playerSystem?.teleport(data.x, data.y, data.z);
+      this.overlay?.addLogItem(`📅 Arrived at meeting: ${data.title || "Meeting"}`);
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("meet")) {
+        url.searchParams.delete("meet");
+        history.replaceState({}, "", url);
+      }
+    };
+    this.networkSystem.onMeetMissing = () => {
+      this.overlay?.addLogItem("📅 That meeting place is gone.");
+    };
+
+    this.goToMeeting = (id) => {
+      this.networkSystem?.sendMeetGoto(id);
     };
   }
 
@@ -372,7 +488,7 @@ class OpenSpaceApp {
     // 3. Update combat effects (laser beam lifespan, hit sparks)
     this.combatSystem.update(delta);
 
-    // 4. Update modular world objects (Hyperlane Jump Gate, planetoids)
+    // 4. Update modular world objects (planetoids, containers)
     this.worldSystem.update(
       delta,
       elapsedTime,
@@ -390,7 +506,8 @@ class OpenSpaceApp {
         this.playerSystem.position.y,
         this.playerSystem.position.z,
         this.playerSystem.euler.y,
-        this.playerSystem.euler.x
+        (this.playerSystem.drivingCar || this.playerSystem.gravityOn) ? 0 : this.playerSystem.euler.x,
+        !!this.playerSystem.drivingCar
       );
 
       // Check spatial audio proximity (50 units)
@@ -398,7 +515,24 @@ class OpenSpaceApp {
 
       // Update HUD coordinates and health
       this.overlay.updateHUD(this.playerSystem.position, this.playerSystem.health);
+      if (this.playerSystem.drivingCar) {
+        this.overlay.updateSpeedo(this.vehicleSystem?.getSpeedKmh?.() || 0);
+      }
+      this.overlay.sceneBeacon = (stranded, distance) => {
+        this.sceneSystem.setBeaconFocus(stranded, distance);
+      };
+      this.overlay.updateReturnBeacon(
+        this.playerSystem.position,
+        this.sceneSystem.camera,
+        this.playerSystem.returnSpeed || this.playerSystem.maxSpeed
+      );
+      if (!this.overlay.stranded) {
+        this.sceneSystem.setBeaconFocus(false, this.playerSystem.position.length());
+      }
     }
+
+    this.sweepExpiredLinks?.();
+    updateGraffitiLinks(this.worldSystem?.objects, this.sceneSystem.camera);
 
     // 6. Render Frame
     this.sceneSystem.renderer.render(this.sceneSystem.scene, this.sceneSystem.camera);

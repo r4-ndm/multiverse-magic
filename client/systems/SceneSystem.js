@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
 
 /**
  * SceneSystem manages the 3D environment, lighting, starfield, and nebula.
@@ -33,23 +34,39 @@ export class SceneSystem {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.1;
+    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-    // 4. Lighting setup
-    const ambientLight = new THREE.AmbientLight(0x334466, 0.8);
+    // HDR studio reflections — this is what makes clearcoat paint read like GTA.
+    // Background stays deep space; only the environment map uses the HDR.
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    const hdrUrl = new URL("../assets/hdr/studio_sunset_1k.hdr", import.meta.url).href;
+    new RGBELoader().load(hdrUrl, (texture) => {
+      const env = pmrem.fromEquirectangular(texture).texture;
+      this.scene.environment = env;
+      texture.dispose();
+      pmrem.dispose();
+    });
+
+    const ambientLight = new THREE.AmbientLight(0x223044, 0.22);
     this.scene.add(ambientLight);
 
-    const sunLight = new THREE.DirectionalLight(0xffffff, 1.4);
-    sunLight.position.set(200, 300, 150);
+    const sunLight = new THREE.DirectionalLight(0xfff4e8, 2.05);
+    sunLight.position.set(80, 140, 90);
     this.scene.add(sunLight);
 
-    const rimLight = new THREE.DirectionalLight(0x00f0ff, 0.6);
-    rimLight.position.set(-200, -100, -200);
+    const rimLight = new THREE.DirectionalLight(0x9ad7ff, 1.35);
+    rimLight.position.set(-90, 40, -120);
     this.scene.add(rimLight);
 
-    // 5. Starfield & Nebula
+    const fill = new THREE.DirectionalLight(0xffffff, 0.45);
+    fill.position.set(20, 30, -60);
+    this.scene.add(fill);
+
+    // 5. Starfield, nebula, and the sector beacon pilots fly home to
     this.createStarfield();
     this.createNebula();
+    this.createSectorBeacon();
 
     // 6. Handle resizing
     window.addEventListener("resize", () => this.onWindowResize());
@@ -128,6 +145,50 @@ export class SceneSystem {
 
     this.stars = new THREE.Points(geometry, material);
     this.scene.add(this.stars);
+  }
+
+  createSectorBeacon() {
+    const canvas = document.createElement("canvas");
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext("2d");
+    const glow = ctx.createRadialGradient(64, 64, 2, 64, 64, 64);
+    glow.addColorStop(0, "rgba(255, 252, 230, 1)");
+    glow.addColorStop(0.12, "rgba(255, 214, 64, 0.95)");
+    glow.addColorStop(0.34, "rgba(0, 240, 255, 0.28)");
+    glow.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.strokeStyle = "rgba(255, 214, 64, 0.85)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(64, 64, 22, 0, Math.PI * 2);
+    ctx.stroke();
+
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: new THREE.CanvasTexture(canvas),
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+      fog: false,
+      sizeAttenuation: false,
+      blending: THREE.AdditiveBlending,
+    }));
+    sprite.scale.set(0.042, 0.042, 1);
+    sprite.renderOrder = 3;
+    sprite.position.set(0, 0, 0);
+    this.scene.add(sprite);
+    this.beacon = sprite;
+  }
+
+  setBeaconFocus(stranded, distance) {
+    if (!this.beacon) return;
+    const near = distance < 140;
+    this.beacon.visible = !near;
+    const pulse = 0.9 + Math.sin(performance.now() * 0.004) * (stranded ? 0.16 : 0.06);
+    const scale = (stranded ? 0.072 : 0.04) * pulse;
+    this.beacon.scale.set(scale, scale, 1);
+    this.beacon.material.opacity = stranded ? 1 : 0.7;
   }
 
   createNebula() {

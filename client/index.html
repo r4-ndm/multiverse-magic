@@ -159,6 +159,60 @@
       background: var(--neon-pink);
       box-shadow: 0 0 8px var(--neon-pink);
     }
+    .join-link {
+      color: var(--neon-cyan);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      word-break: break-all;
+      text-decoration: none;
+    }
+    .join-link:hover {
+      text-decoration: underline;
+    }
+    #graffiti-links {
+      position: fixed;
+      inset: 0;
+      z-index: 12;
+      pointer-events: none;
+    }
+    #graffiti-links a {
+      position: fixed;
+      z-index: 12;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 240, 255, 0.7);
+      background: rgba(6, 12, 24, 0.88);
+      color: #7dd3fc;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      word-break: break-all;
+      text-align: center;
+      line-height: 1.35;
+      box-shadow: 0 0 18px rgba(0, 240, 255, 0.35);
+      cursor: pointer;
+      pointer-events: auto;
+    }
+    #graffiti-links a:hover {
+      color: #ffffff;
+      background: rgba(0, 240, 255, 0.22);
+    }
+    .join-copy-btn {
+      margin-left: 6px;
+      padding: 1px 6px;
+      font-size: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      border: 1px solid rgba(255, 215, 0, 0.6);
+      background: transparent;
+      color: #ffd700;
+      border-radius: 4px;
+      cursor: pointer;
+    }
 
     /* Bottom Left: Player Health & Mic */
     #health-panel {
@@ -305,6 +359,72 @@
       font-size: 14px;
       line-height: 1.5;
     }
+    #return-compass {
+      position: absolute;
+      left: 50%;
+      bottom: 118px;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 280px;
+      padding: 10px 16px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 214, 64, 0.7);
+      background: rgba(10, 14, 26, 0.88);
+      box-shadow: 0 0 28px rgba(255, 214, 64, 0.22);
+      color: #ffe9a0;
+      pointer-events: none;
+      z-index: 40;
+    }
+    #return-compass[hidden] { display: none; }
+    #return-arrow {
+      width: 0;
+      height: 0;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-bottom: 16px solid #ffd640;
+      filter: drop-shadow(0 0 6px rgba(255, 214, 64, 0.8));
+      flex: none;
+    }
+    #return-copy strong {
+      display: block;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 12px;
+      letter-spacing: 1.4px;
+      color: #ffd640;
+    }
+    #return-copy span {
+      display: block;
+      margin-top: 3px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: #fff6d2;
+    }
+    #return-pip {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      border: 2px solid #ffd640;
+      border-radius: 50%;
+      box-shadow: 0 0 14px rgba(255, 214, 64, 0.85);
+      pointer-events: none;
+      z-index: 39;
+    }
+    #return-pip::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: -9px;
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-bottom: 8px solid #ffd640;
+      transform: translateX(-50%);
+    }
+    #return-pip[hidden] { display: none; }
     @keyframes alertPop {
       0% { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
       100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
@@ -520,6 +640,53 @@
       transform: scale(1.2);
     }
 
+    .portrait-box {
+      text-align: left;
+      margin: 4px 0 16px;
+    }
+    .portrait-hint {
+      margin: 0 0 8px;
+      font-size: 11px;
+      line-height: 1.4;
+      color: #8fa0c0;
+    }
+    .portrait-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .portrait-file {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+    }
+    .portrait-pick {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 240, 255, 0.45);
+      background: rgba(0, 240, 255, 0.08);
+      color: #00f0ff;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .portrait-pick:hover {
+      background: rgba(0, 240, 255, 0.16);
+    }
+    .portrait-preview {
+      width: 56px;
+      height: 56px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      background: #06090f;
+    }
+    .portrait-preview[hidden] { display: none; }
     .custom-avatar-input {
       width: 100%;
       background: rgba(4, 7, 15, 0.9);
@@ -633,15 +800,6 @@
       box-shadow: 0 0 16px rgba(0, 240, 255, 0.6);
       transform: translateY(-1px);
     }
-    #hud-camera-btn {
-      border-color: #ffd700;
-      color: #ffd700;
-      box-shadow: 0 0 10px rgba(255, 215, 0, 0.25);
-    }
-    #hud-camera-btn:hover {
-      background: rgba(255, 215, 0, 0.2);
-      box-shadow: 0 0 16px rgba(255, 215, 0, 0.6);
-    }
     #hud-starmap-btn {
       border-color: #a855f7;
       color: #d8b4fe;
@@ -659,6 +817,57 @@
     #hud-build-btn:hover {
       background: rgba(0, 255, 136, 0.2);
       box-shadow: 0 0 16px rgba(0, 255, 136, 0.6);
+    }
+    #hud-gravity-btn {
+      border-color: #ff9f1c;
+      color: #ffb347;
+      box-shadow: 0 0 10px rgba(255, 159, 28, 0.25);
+    }
+    #hud-gravity-btn:hover,
+    #hud-gravity-btn.armed {
+      background: rgba(255, 159, 28, 0.2);
+      box-shadow: 0 0 16px rgba(255, 159, 28, 0.55);
+    }
+    #hud-drive-btn {
+      border-color: #ff4455;
+      color: #ff7788;
+      box-shadow: 0 0 10px rgba(255, 68, 85, 0.25);
+    }
+    #hud-drive-btn:hover,
+    #hud-drive-btn.armed {
+      background: rgba(255, 68, 85, 0.2);
+      box-shadow: 0 0 16px rgba(255, 68, 85, 0.55);
+    }
+    #hud-speedo {
+      position: absolute;
+      right: 28px;
+      bottom: 118px;
+      min-width: 110px;
+      padding: 10px 14px 12px;
+      background: rgba(8, 10, 16, 0.82);
+      border: 1px solid rgba(255, 68, 85, 0.55);
+      border-radius: 6px;
+      color: #ffd0d6;
+      font-family: "Share Tech Mono", "Courier New", monospace;
+      text-align: right;
+      letter-spacing: 0.04em;
+      pointer-events: none;
+      box-shadow: 0 0 18px rgba(255, 68, 85, 0.22);
+    }
+    #hud-speedo .label {
+      font-size: 11px;
+      opacity: 0.75;
+    }
+    #hud-speedo-value {
+      display: block;
+      font-size: 34px;
+      line-height: 1;
+      color: #fff;
+      text-shadow: 0 0 12px rgba(255, 80, 100, 0.55);
+    }
+    #hud-speedo .unit {
+      font-size: 12px;
+      opacity: 0.8;
     }
 
     /* Jump Gate Proximity Banner */
@@ -896,231 +1105,136 @@
       box-shadow: 0 0 12px rgba(0, 255, 136, 0.4);
     }
 
-    /* Cosmic Web TV Modal / In-Flight Hypertext Browser */
-    #cosmic-tv-modal {
+    #link-gun-modal,
+    #meeting-modal {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      width: 980px;
-      max-width: 95vw;
-      height: 82vh;
-      max-height: 860px;
-      background: radial-gradient(circle at center, #131722 0%, #080a10 100%);
-      border: 3px solid #b87333;
-      box-shadow: 0 0 60px rgba(184, 115, 51, 0.45), 0 0 120px rgba(0, 240, 255, 0.2), inset 0 0 30px rgba(0, 0, 0, 0.8);
-      border-radius: 18px;
+      width: min(520px, 92vw);
+      background: rgba(10, 14, 26, 0.96);
+      border: 1px solid rgba(0, 240, 255, 0.55);
+      box-shadow: 0 0 45px rgba(0, 240, 255, 0.25);
+      border-radius: 12px;
       z-index: 65;
       display: none;
-      backdrop-filter: blur(20px);
       pointer-events: auto;
       flex-direction: column;
-      overflow: hidden;
-      padding: 14px;
+      gap: 14px;
+      padding: 20px;
     }
-    .tv-bezel-frame {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      width: 100%;
-      border: 1px solid rgba(255, 180, 100, 0.2);
-      border-radius: 12px;
-      padding: 10px;
-      background: rgba(4, 6, 12, 0.85);
-      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.9);
-    }
-    .tv-header {
+    .tv-panel-header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      padding-bottom: 10px;
-      border-bottom: 1px solid rgba(184, 115, 51, 0.3);
-      margin-bottom: 8px;
+      align-items: flex-start;
+      gap: 12px;
     }
-    .tv-antenna-indicator {
+    .tv-panel-header h3 {
       font-family: 'Orbitron', sans-serif;
-      font-size: 13px;
-      font-weight: 800;
-      color: #ffd700;
-      letter-spacing: 1.5px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
+      color: var(--neon-cyan);
+      letter-spacing: 1px;
+      margin: 0 0 4px 0;
+      font-size: 16px;
     }
-    .tv-channel-title {
+    .tv-panel-header p {
       font-size: 11px;
-      color: #94a3b8;
-      margin-top: 2px;
+      color: #8fa0c0;
+      margin: 0;
     }
     .tv-close-btn {
-      background: rgba(255, 0, 85, 0.15);
-      border: 1px solid var(--neon-pink);
-      color: #ff99bb;
-      font-size: 20px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: #94a3b8;
+      font-size: 22px;
       line-height: 1;
       width: 28px;
       height: 28px;
-      border-radius: 6px;
+      border-radius: 4px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.2s ease;
+      flex-shrink: 0;
     }
     .tv-close-btn:hover {
-      background: var(--neon-pink);
-      color: #ffffff;
-      box-shadow: 0 0 12px var(--neon-pink);
+      background: rgba(255, 0, 85, 0.2);
+      border-color: rgba(255, 0, 85, 0.5);
+      color: #fff;
     }
-    .tv-browser-bar {
+    .tv-open-link[hidden],
+    .tv-link-empty[hidden] {
+      display: none;
+    }
+    .tv-link-empty {
+      margin: 0;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px dashed rgba(148, 163, 184, 0.35);
+      color: #8fa0c0;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .tv-open-link {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      background: rgba(0, 240, 255, 0.08);
+      color: #00f0ff;
+      text-decoration: none;
+      font-family: 'JetBrains Mono', monospace;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .tv-open-link:hover {
+      background: rgba(0, 240, 255, 0.16);
+      border-color: #00f0ff;
+    }
+    .tv-open-link strong {
+      font-size: 13px;
+      letter-spacing: 0.4px;
+    }
+    .tv-open-link span {
+      color: #e0f2fe;
+      font-size: 12px;
+      word-break: break-all;
+    }
+    .tv-url-row {
       display: flex;
       gap: 8px;
       align-items: center;
-      margin-bottom: 8px;
-    }
-    .tv-url-prefix {
-      font-weight: 800;
-      font-size: 11px;
-      color: #ffd700;
-      padding: 8px 10px;
-      background: rgba(184, 115, 51, 0.15);
-      border: 1px solid rgba(184, 115, 51, 0.4);
-      border-radius: 6px;
     }
     .tv-url-input {
       flex: 1;
-      background: rgba(10, 14, 26, 0.95);
-      border: 1px solid rgba(0, 240, 255, 0.4);
-      color: #00f0ff;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      padding: 8px 12px;
-      border-radius: 6px;
-      outline: none;
-      transition: border-color 0.2s ease;
-    }
-    .tv-url-input:focus {
-      border-color: #00ff88;
-      box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
-    }
-    .tv-action-btn {
-      padding: 8px 14px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      font-weight: 700;
-      border-radius: 6px;
-      cursor: pointer;
-      border: none;
-      transition: all 0.2s ease;
-      white-space: nowrap;
-    }
-    .tv-go-btn {
-      background: linear-gradient(135deg, #00f0ff, #00ff88);
-      color: #050811;
-      box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
-    }
-    .tv-go-btn:hover {
-      box-shadow: 0 0 18px rgba(0, 255, 136, 0.7);
-      transform: translateY(-1px);
-    }
-    .tv-sync-btn {
-      background: linear-gradient(135deg, #9d00ff, #ff0055);
-      color: #ffffff;
-      box-shadow: 0 0 10px rgba(157, 0, 255, 0.3);
-    }
-    .tv-sync-btn:hover {
-      box-shadow: 0 0 18px rgba(255, 0, 85, 0.7);
-      transform: translateY(-1px);
-    }
-    .tv-presets-bar {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-      flex-wrap: wrap;
-      margin-bottom: 8px;
-    }
-    .tv-preset-label {
-      font-size: 10px;
-      color: #ffd700;
-      font-weight: 700;
-      margin-right: 2px;
-    }
-    .tv-preset-btn {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: #06090f;
+      border: 1px solid rgba(0, 240, 255, 0.35);
       color: #e0f2fe;
       font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      padding: 4px 8px;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.15s ease;
+      font-size: 12px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      outline: none;
+      -webkit-user-select: text;
+      user-select: text;
     }
-    .tv-preset-btn:hover {
-      background: rgba(0, 240, 255, 0.2);
+    .tv-url-input:focus {
       border-color: #00f0ff;
-      color: #00f0ff;
     }
-    .tv-crt-viewport {
-      flex: 1;
-      position: relative;
-      background: #000000;
-      border-radius: 8px;
-      overflow: hidden;
-      border: 2px solid rgba(184, 115, 51, 0.4);
-      box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.95);
-      min-height: 350px;
-    }
-    #tv-screen-frame {
-      width: 100%;
-      height: 100%;
-      border: none;
-      background: #ffffff;
-      display: block;
-    }
-    .tv-scanlines {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.22) 50%);
-      background-size: 100% 4px;
-      opacity: 0.3;
-      z-index: 2;
-    }
-    .tv-footer-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 8px;
-      padding-top: 6px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    .tv-go-btn {
+      padding: 8px 12px;
+      font-family: 'JetBrains Mono', monospace;
       font-size: 11px;
-      color: #64748b;
-    }
-    .tv-footer-status {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      color: #00ff88;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      font-weight: 700;
+      border-radius: 6px;
+      cursor: pointer;
+      border: none;
+      background: #00f0ff;
+      color: #050811;
       white-space: nowrap;
-      max-width: 60%;
     }
-    .tv-blinking-led {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: #00ff88;
-      box-shadow: 0 0 8px #00ff88;
-      animation: blinkLed 1.5s infinite ease-in-out;
-    }
-    @keyframes blinkLed {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
+    .tv-go-btn:hover {
+      filter: brightness(1.08);
     }
   </style>
 </head>
@@ -1144,6 +1258,7 @@
       <div>PILOT ID: <span id="hud-player-id" style="color:var(--neon-cyan)">...</span></div>
       <div>POS: <span id="hud-coords">X: 0.0 | Y: 0.0 | Z: 0.0</span></div>
       <div>PROXIMITY RAD: <span style="color:var(--neon-green)">50u</span></div>
+      <div>OPEN SPACE: <a id="hud-join-link" class="join-link" href="https://multiverse-magic.fly.dev/?system=sol" target="_blank" rel="noopener noreferrer">https://multiverse-magic.fly.dev/?system=sol</a> <button id="hud-copy-link" class="join-copy-btn" type="button">COPY</button></div>
     </div>
 
     <!-- Top Right: Event Log -->
@@ -1157,9 +1272,17 @@
     <!-- Center Ejection Banner -->
     <div id="ejection-banner">
       <h2>DEEP SPACE EJECTION</h2>
-      <p id="ejection-text">You sustained critical damage and were ejected into deep space!</p>
-      <p style="margin-top:8px; font-weight:700; color:#fff;" id="ejection-distance">Distance to sector center: 17,320 units</p>
+      <p id="ejection-text">Critical damage. You were thrown into deep space. The gold star is the sector. Burn toward it. There is no jump home.</p>
+      <p style="margin-top:8px; font-weight:700; color:#fff;" id="ejection-distance">Distance to sector: 17,320 units</p>
     </div>
+    <div id="return-compass" hidden>
+      <div id="return-arrow"></div>
+      <div id="return-copy">
+        <strong id="return-heading">BEACON AHEAD</strong>
+        <span id="return-meta">Fly the gold star back to the sector.</span>
+      </div>
+    </div>
+    <div id="return-pip" hidden></div>
 
     <!-- Bottom Left: Health -->
     <div id="health-panel" class="hud-panel">
@@ -1179,18 +1302,25 @@
         <span id="voice-status-text">Mic: Inactive</span>
       </div>
       <div class="keybind-hint">
-        WASD: Fly & Strafe | Space/C: Ascend/Descend<br/>
-        Left Click / F: Shoot | E: Cosmic TV | V: View | B: Build Planet | J: Starmap | H: Morph
+        WASD: Fly / Walk / Drive | Q: Jump | Shift: Handbrake | G: Gravity | V: Drive<br/>
+        F: Cabin/Chase (in car) | Space: Shoot | E: Link | M: Meeting | B: Block | H: Morph
       </div>
     </div>
 
     <!-- In-Game Action Buttons -->
     <div id="hud-action-bar">
-      <button id="hud-camera-btn" class="hud-action-btn">🎯 1ST PERSON [V]</button>
-      <button id="hud-tv-btn" class="hud-action-btn" style="border-color:#ffd700; color:#ffd700;">📺 COSMIC TV [E]</button>
+      <button id="hud-link-btn" class="hud-action-btn" style="border-color:#ff2bd6; color:#ff2bd6;">🔗 LINK GUN [E]</button>
+      <button id="hud-meet-btn" class="hud-action-btn" style="border-color:#ffd700; color:#ffd700;">📅 MEETING [M]</button>
       <button id="hud-morph-btn" class="hud-action-btn">🎭 MORPH [H]</button>
-      <button id="hud-build-btn" class="hud-action-btn">🪐 BUILD PLANET [B]</button>
-      <button id="hud-starmap-btn" class="hud-action-btn">🚀 STARMAP [J]</button>
+      <button id="hud-build-btn" class="hud-action-btn">📦 BLOCK GUN [B]</button>
+      <button id="hud-gravity-btn" class="hud-action-btn">🪐 GRAVITY [G]</button>
+      <button id="hud-drive-btn" class="hud-action-btn">🚗 DRIVE [V]</button>
+    </div>
+
+    <div id="hud-speedo" hidden>
+      <div class="label">SPEED</div>
+      <span id="hud-speedo-value">0</span>
+      <span class="unit">KM/H</span>
     </div>
 
     <!-- Floating Jump Gate Proximity Banner -->
@@ -1200,83 +1330,41 @@
   <!-- Hyperspace Warp Tunnel Visual FX -->
   <div id="warp-tunnel-overlay"></div>
 
-  <!-- Cosmic Web TV Modal / In-Flight Browser -->
-  <div id="cosmic-tv-modal">
-    <div class="tv-bezel-frame">
-      <div class="tv-header">
-        <div class="tv-header-left">
-          <div class="tv-antenna-indicator">📡 LIVE RETRO-COSMIC WEB TV</div>
-          <div class="tv-channel-title" id="tv-active-title">Hypertext Space Terminal</div>
-        </div>
-        <div class="tv-header-controls">
-          <button id="tv-close-btn" class="tv-close-btn" title="Exit TV (or press E / ESC)">&times;</button>
-        </div>
-      </div>
+  <div id="graffiti-links" hidden></div>
 
-      <div class="tv-browser-bar">
-        <span class="tv-url-prefix">HTTP://</span>
-        <input type="text" id="tv-url-input" class="tv-url-input" placeholder="Enter URL (e.g. en.wikipedia.org, nasa.gov, news.ycombinator.com)..." spellcheck="false" />
-        <button id="tv-go-btn" class="tv-action-btn tv-go-btn">TUNE &amp; GO</button>
-        <button id="tv-broadcast-btn" class="tv-action-btn tv-sync-btn" title="Broadcast this web channel to all pilots in the solar system">📡 BROADCAST</button>
+  <div id="meeting-modal">
+    <div class="tv-panel-header">
+      <div>
+        <h3>ARRANGE A MEETING</h3>
+        <p>Shoot it onto a container. The box stays until that time. The link brings people to it. Up to 5 days ahead.</p>
       </div>
-
-      <!-- Quick Preset Channels -->
-      <div class="tv-presets-bar">
-        <span class="tv-preset-label">CHANNELS:</span>
-        <button class="tv-preset-btn" data-url="https://en.wikipedia.org/wiki/Space_exploration" data-title="Wikipedia — Space Exploration">🚀 Space</button>
-        <button class="tv-preset-btn" data-url="https://en.wikipedia.org/wiki/Frog" data-title="Wikipedia — Cosmic Frog">🐸 Frog</button>
-        <button class="tv-preset-btn" data-url="https://en.wikipedia.org/wiki/Squirrel" data-title="Wikipedia — Galactic Squirrel">🐿️ Squirrel</button>
-        <button class="tv-preset-btn" data-url="https://en.wikipedia.org/wiki/Solar_System" data-title="Wikipedia — Solar System">🪐 Solar System</button>
-        <button class="tv-preset-btn" data-url="https://news.ycombinator.com" data-title="Hacker News Live">📰 Hacker News</button>
-        <button class="tv-preset-btn" data-url="https://www.w3.org/History/19921103-hypertext/hypertext/WWW/TheProject.html" data-title="First Web Page (1992)">🕹️ 1992 Web</button>
-      </div>
-
-      <!-- CRT Display with Scanlines -->
-      <div class="tv-crt-viewport">
-        <iframe id="tv-screen-frame" src="" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
-        <div class="tv-scanlines"></div>
-      </div>
-
-      <!-- Status Bar -->
-      <div class="tv-footer-bar">
-        <div class="tv-footer-status">
-          <span class="tv-blinking-led"></span>
-          <span id="tv-status-msg">Tuned to: https://en.wikipedia.org/wiki/Space_exploration</span>
-        </div>
-        <div class="tv-footer-hint">
-          Press <b>[E]</b> or <b>[ESC]</b> to resume spaceflight
-        </div>
+      <button id="meeting-close-btn" class="tv-close-btn" title="Close (ESC)">&times;</button>
+    </div>
+    <div>
+      <span class="section-label">TITLE</span>
+      <input type="text" id="meeting-title-input" class="tv-url-input" maxlength="40" placeholder="Dock briefing" spellcheck="false" style="width:100%; margin-bottom:10px;" />
+      <span class="section-label">WHEN</span>
+      <div class="tv-url-row">
+        <input type="datetime-local" id="meeting-when-input" class="tv-url-input" />
+        <button id="meeting-load-btn" class="tv-go-btn">ARM</button>
       </div>
     </div>
   </div>
 
-  <!-- Interstellar Starmap Modal -->
-  <div id="starmap-modal">
-    <div class="starmap-header">
+  <div id="link-gun-modal">
+    <div class="tv-panel-header">
       <div>
-        <h3 style="font-family:'Orbitron',sans-serif; color:var(--neon-cyan); letter-spacing:1px; margin:0 0 4px 0;">INTERSTELLAR STARMAP // HYPERLANES</h3>
-        <p style="font-size:11px; color:#8fa0c0; margin:0;">Federated Solar System Directory — Warp across the Open Multiverse</p>
+        <h3>LINK GUN</h3>
+        <p>Spray a link onto a container. It fades after 60 seconds.</p>
       </div>
-      <button id="starmap-close-btn" style="background:none; border:none; color:#8fa0c0; font-size:24px; cursor:pointer; padding:0 6px;">&times;</button>
+      <button id="link-close-btn" class="tv-close-btn" title="Close (ESC)">&times;</button>
     </div>
-
-    <span class="section-label">CONNECTED SOLAR SYSTEMS</span>
-    <div class="system-grid" id="starmap-system-grid">
-      <!-- Populated dynamically -->
-    </div>
-
-    <span class="section-label">CONNECT CUSTOM SOLAR SYSTEM (FEDERATED URL)</span>
-    <div class="custom-system-box">
-      <input type="text" id="custom-system-url" placeholder="https://creator-solarsystem.fly.dev" class="custom-avatar-input" style="flex:1;" />
-      <button id="custom-system-jump-btn" class="hud-action-btn" style="position:static; border-color:#00f0ff; color:#00f0ff;">ALIGN & JUMP</button>
-    </div>
-
-    <span class="section-label">FEDERATION BEACON (SHARE YOUR SOLAR SYSTEM)</span>
-    <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:12px; margin-top:6px;">
-      <p style="font-size:11px; color:#8fa0c0; margin:0 0 6px 0;">Other creators can point their Jump Gates to this URL with zero permissions:</p>
-      <div class="share-url-row">
-        <input type="text" id="my-system-beacon-url" readonly class="custom-avatar-input" style="flex:1;" />
-        <button id="copy-beacon-btn" class="hud-action-btn" style="position:static; border-color:#ffd700; color:#ffd700;">COPY BEACON</button>
+    <div>
+      <span class="section-label">LINK TO SPRAY</span>
+      <div class="tv-url-row">
+        <input type="text" id="link-url-input" class="tv-url-input" placeholder="https://example.com" spellcheck="false" />
+        <button id="link-load-btn" class="tv-go-btn">LOAD</button>
+      </div>
     </div>
   </div>
 
@@ -1473,6 +1561,16 @@
       <div class="color-swatch" data-color="#00ff66" style="background:#00ff66;" title="Green"></div>
     </div>
 
+    <div class="portrait-box">
+      <span class="section-label">YOUR PICTURE</span>
+      <p class="portrait-hint">Square, 512×512. Any photo is cropped and shrunk to that.</p>
+      <div class="portrait-row">
+        <label class="portrait-pick" for="morph-avatar-file">CHOOSE PICTURE</label>
+        <input class="portrait-file" type="file" id="morph-avatar-file" accept="image/png,image/jpeg,image/webp" />
+        <img class="portrait-preview" id="morph-avatar-preview" alt="" hidden />
+      </div>
+    </div>
+
     <details style="margin-top: 14px; text-align: left; cursor: pointer;">
       <summary style="font-size: 11px; color: var(--neon-cyan); font-weight: 600; outline: none; margin-bottom: 8px;">
         ⚙️ Advanced: Load Custom 3D Model (.GLB URL)
@@ -1491,6 +1589,11 @@
     <div class="entry-card">
       <h1 class="entry-title">MULTIVERSE MAGIC</h1>
       <p class="entry-tagline">A Permissionless 3D Proximity Chat Universe</p>
+      <p style="font-size:11px; color:#8fa0c0; margin:0 0 14px 0;">
+        Join this Open Space:<br/>
+        <a id="entry-join-link" class="join-link" href="https://multiverse-magic.fly.dev/?system=sol" target="_blank" rel="noopener noreferrer">https://multiverse-magic.fly.dev/?system=sol</a>
+        <button id="entry-copy-link" class="join-copy-btn" type="button">COPY</button>
+      </p>
 
       <div class="pilot-name-box">
         <label for="pilot-name-input">PILOT CALLSIGN // NAME</label>
@@ -1550,6 +1653,16 @@
           <div class="color-swatch" data-color="#ff0055" style="background:#ff0055;" title="Pink"></div>
           <div class="color-swatch" data-color="#ffd700" style="background:#ffd700;" title="Gold"></div>
           <div class="color-swatch" data-color="#00ff66" style="background:#00ff66;" title="Green"></div>
+        </div>
+
+        <div class="portrait-box">
+          <span class="section-label">YOUR PICTURE</span>
+          <p class="portrait-hint">Square, 512×512. Any photo is cropped and shrunk to that.</p>
+          <div class="portrait-row">
+            <label class="portrait-pick" for="entry-avatar-file">CHOOSE PICTURE</label>
+            <input class="portrait-file" type="file" id="entry-avatar-file" accept="image/png,image/jpeg,image/webp" />
+            <img class="portrait-preview" id="entry-avatar-preview" alt="" hidden />
+          </div>
         </div>
 
         <details style="margin-top: 14px; text-align: left; cursor: pointer;">

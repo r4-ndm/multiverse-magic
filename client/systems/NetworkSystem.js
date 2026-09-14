@@ -20,6 +20,7 @@ export class NetworkSystem {
     this.onShotFired = null;
     this.onPlayerHit = null;
     this.onPlayerEjected = null;
+    this.onStillExiled = null;
     this.onSignalReceived = null;
     this.onChatMessage = null;
     this.onNameChanged = null;
@@ -27,14 +28,27 @@ export class NetworkSystem {
     this.onPlanetsSync = null;
     this.onPlanetCreated = null;
     this.onPlanetDeleted = null;
-    this.onTVSync = null;
-    this.onTVTuned = null;
+    this.onPlanetDamaged = null;
+    this.onBlocksSync = null;
+    this.onBlockPlaced = null;
+    this.onBlockDamaged = null;
+    this.onBlockDeleted = null;
+    this.onBlockRejected = null;
+    this.onLinksSync = null;
+    this.onLinkPainted = null;
+    this.onLinkCleared = null;
+    this.onLinkRejected = null;
+    this.onMeetingScheduled = null;
+    this.onMeetingRejected = null;
+    this.onMeetArrived = null;
+    this.onMeetMissing = null;
   }
 
   async connect(serverUrl, options = {}) {
     // Zero friction: Room determined by URL param or default "space"
     const params = new URLSearchParams(window.location.search);
     const roomName = params.get("room") || "space";
+    if (params.get("meet") && !options.meet) options.meet = params.get("meet");
 
     let defaultWsUrl;
     if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
@@ -96,6 +110,10 @@ export class NetworkSystem {
       if (this.onPlayerEjected) this.onPlayerEjected(data);
     });
 
+    this.room.onMessage("still_exiled", (data) => {
+      if (this.onStillExiled) this.onStillExiled(data);
+    });
+
     this.room.onMessage("signal", (data) => {
       if (this.onSignalReceived) this.onSignalReceived(data.from, data.signal);
     });
@@ -134,20 +152,67 @@ export class NetworkSystem {
       if (this.onPlanetDeleted) this.onPlanetDeleted(data.id);
     });
 
-    // Cosmic TV Synchronization Handlers
-    this.room.onMessage("tv_sync", (data) => {
-      if (this.onTVSync) this.onTVSync(data);
+    this.room.onMessage("planet_damaged", (data) => {
+      if (this.onPlanetDamaged) this.onPlanetDamaged(data);
     });
 
-    this.room.onMessage("tv_tuned", (data) => {
-      if (this.onTVTuned) this.onTVTuned(data);
+    this.room.onMessage("blocks_sync", (blocks) => {
+      if (this.onBlocksSync) this.onBlocksSync(blocks);
+    });
+
+    this.room.onMessage("block_placed", (data) => {
+      if (this.onBlockPlaced) this.onBlockPlaced(data);
+    });
+
+    this.room.onMessage("block_damaged", (data) => {
+      if (this.onBlockDamaged) this.onBlockDamaged(data);
+    });
+
+    this.room.onMessage("block_deleted", (data) => {
+      if (this.onBlockDeleted) this.onBlockDeleted(data.id);
+    });
+
+    this.room.onMessage("block_rejected", (data) => {
+      if (this.onBlockRejected) this.onBlockRejected(data);
+    });
+
+    this.room.onMessage("links_sync", (links) => {
+      if (this.onLinksSync) this.onLinksSync(links);
+    });
+
+    this.room.onMessage("link_painted", (data) => {
+      if (this.onLinkPainted) this.onLinkPainted(data);
+    });
+
+    this.room.onMessage("link_cleared", (data) => {
+      if (this.onLinkCleared) this.onLinkCleared(data);
+    });
+
+    this.room.onMessage("link_rejected", (data) => {
+      if (this.onLinkRejected) this.onLinkRejected(data);
+    });
+
+    this.room.onMessage("meeting_scheduled", (data) => {
+      if (this.onMeetingScheduled) this.onMeetingScheduled(data);
+    });
+
+    this.room.onMessage("meeting_rejected", (data) => {
+      if (this.onMeetingRejected) this.onMeetingRejected(data);
+    });
+
+    this.room.onMessage("meet_arrived", (data) => {
+      if (this.onMeetArrived) this.onMeetArrived(data);
+    });
+
+    this.room.onMessage("meet_missing", (data) => {
+      if (this.onMeetMissing) this.onMeetMissing(data);
     });
   }
 
   /**
    * Throttled position update to server (every 50ms)
    */
-  sendPosition(x, y, z, rotation, pitch) {
+  sendPosition(x, y, z, rotation, pitch, driving = false) {
     if (!this.room) return;
     const now = performance.now();
     if (now - this.lastSentTime < this.sendInterval) return;
@@ -159,6 +224,7 @@ export class NetworkSystem {
       z: Number(z.toFixed(2)),
       rotation: Number(rotation.toFixed(3)),
       pitch: Number(pitch.toFixed(3)),
+      driving: !!driving,
     });
   }
 
@@ -192,6 +258,11 @@ export class NetworkSystem {
     this.room.send("set_name", name);
   }
 
+  sendPlaceBlock(x, y, z, color) {
+    if (!this.room) return;
+    this.room.send("place_block", { x, y, z, color });
+  }
+
   sendBuildPlanet(planetData) {
     if (!this.room) return;
     this.room.send("build_planet", planetData);
@@ -202,8 +273,18 @@ export class NetworkSystem {
     this.room.send("delete_planet", { id: planetId });
   }
 
-  sendTuneTV(url, title = "") {
+  sendScheduleMeeting(blockId, face, title, startsAt) {
     if (!this.room) return;
-    this.room.send("tune_tv", { url, title });
+    this.room.send("schedule_meeting", { blockId, face, title, startsAt });
+  }
+
+  sendMeetGoto(id) {
+    if (!this.room || !id) return;
+    this.room.send("meet_goto", { id });
+  }
+
+  sendPaintLink(blockId, face, url) {
+    if (!this.room) return;
+    this.room.send("paint_link", { blockId, face, url });
   }
 }
